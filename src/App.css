@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Geneva, Verdana, sans-serif;
+  --color-surface: #eeedea;
+  --color-ink: #302f2d;
+  --color-body: #5b5955;
+  --color-muted: #77736d;
+  --color-focus: #aa7435;
+}
+
+@layer base {
+  :root {
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background: var(--color-surface);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background: #e8cfa8;
+    color: #302f2d;
+  }
+}
+
+@layer components {
+  .app-surface {
+    background:
+      radial-gradient(ellipse at 50% 38%, #ffffffb3 0%, #ffffff00 65%),
+      linear-gradient(180deg, #f4f3f0 0%, #eeedea 58%, #e5e3df 100%);
+    box-shadow: inset 0 1px 0 #fff;
+  }
+
+  .warning-symbol {
+    position: relative;
+    filter: drop-shadow(0 2px 1px #70491525) drop-shadow(0 12px 12px #805b2720);
+  }
+
+  .warning-pulse {
+    background: #bd8b3d;
+  }
+
+  .installer-well {
+    border: 1px solid #cbc8c2;
+    background: linear-gradient(180deg, #e9e7e2 0%, #f6f5f2 100%);
+    box-shadow:
+      inset 0 1px 3px #3028200d,
+      0 1px 0 #ffffff;
+  }
+
+  .glass-button {
+    cursor: pointer;
+  }
+
+  .glass-button-neutral {
+    background: linear-gradient(180deg, #fdfcfb 0%, #eae8e5 100%);
+    box-shadow:
+      inset 0 1px 0 #ffffffb3,
+      0 2px 3px #29241c0d;
+  }
+
+  .glass-button-danger {
+    background: linear-gradient(180deg, #cb5b50 0%, #b94137 100%);
+    box-shadow:
+      inset 0 1px 0 #ffffff33,
+      0 2px 4px #68231e1a;
+  }
+
+  .glass-button:hover {
+    filter: brightness(1.035);
+  }
+
+  .glass-button:active,
+  .glass-button[data-holding] {
+    filter: brightness(0.97);
+    box-shadow:
+      inset 0 1px 3px #36171426,
+      0 1px 1px #29241c0a;
+  }
+
+  .installation-log {
+    border: 1px solid #bcbab5;
+    background: #fafaf8;
+    box-shadow:
+      0 1px 0 #fff,
+      0 4px 12px #3028200a;
+  }
+
+  .installation-log-toolbar {
+    border-bottom: 1px solid #bcbab5;
+    background: linear-gradient(180deg, #faf9f7 0%, #e5e3df 100%);
+    box-shadow: inset 0 1px 0 #fff;
+    text-shadow: 0 1px 0 #ffffffb3;
+  }
+
+  .installation-log-content {
+    background: #fcfcfa;
+    box-shadow: inset 0 1px 3px #3028200a;
+    scrollbar-width: thin;
+    scrollbar-color: #c1beb7 #f3f2ee;
+    font-family: Menlo, Monaco, Consolas, monospace;
+  }
+}

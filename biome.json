@@ -1,0 +1,45 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+  "files": {
+    "includes": [
+      "src/**",
+      "tests/**",
+      "vite.config.ts",
+      "package.json",
+      "biome.json",
+      "index.html",
+      "src-tauri/tauri.conf.json"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "css": { "parser": { "tailwindDirectives": true } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": { "filenameCases": ["camelCase", "PascalCase"], "strictCase": false }
+        }
+      },
+      "suspicious": { "noEmptyInterface": "off" }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/assets/iPodClassic.svg"],
+      "formatter": { "enabled": false },
+      "linter": { "enabled": false }
+    },
+    {
+      "includes": ["src/vite-env.d.ts"],
+      "linter": { "rules": { "style": { "useFilenamingConvention": "off" } } }
+    }
+  ]
+}
