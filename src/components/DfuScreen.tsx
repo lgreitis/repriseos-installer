@@ -78,7 +78,7 @@ const DfuScreen: React.FC<IDfuScreenProps> = ({ onContinue }) => {
         animate={{ opacity: imageLoaded ? 1 : 0 }}
         transition={{ duration: reducedMotion ? 0 : 0.25 }}
       >
-        <IpodIllustration onLoad={() => setImageLoaded(true)} />
+        <IpodIllustration showHighlights={ready} onLoad={() => setImageLoaded(true)} />
       </motion.div>
       <motion.div
         initial={{ opacity: 0 }}
