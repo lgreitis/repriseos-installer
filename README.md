@@ -9,7 +9,8 @@ Backups and installation logs stay in the application's data directory.
 ## Run
 
 Requires Node.js, pnpm, Rust, the Tauri platform prerequisites, libusb, and
-pkg-config. Check out `osos-lab` beside this repository for its Rust crates.
+pkg-config. Cargo fetches the shared Rust crates from
+[osos-lab](https://github.com/lgreitis/osos-lab), using the revision in `Cargo.lock`.
 
 ```sh
 pnpm install
