@@ -7,6 +7,7 @@ import { chooseLocalPackage, type PackageInfo, preparePackage } from "../lib/pac
 import { appendSessionLog } from "../lib/sessionLog";
 import { Button } from "./ui/Button";
 import { CheckStatusIndicator } from "./ui/CheckList";
+import { HelpDisclosure } from "./ui/HelpDisclosure";
 import { InformationSymbol } from "./ui/InformationSymbol";
 import { InstallerScreen } from "./ui/InstallerScreen";
 import { ScreenReveal } from "./ui/ScreenReveal";
@@ -155,60 +156,52 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
             )}
           </AnimatePresence>
         </div>
-        <section
-          className="installer-well mx-auto mt-5 max-w-125 rounded-lg p-4 text-left"
-          aria-labelledby="package-title"
-          aria-busy={!!loading}
-        >
-          <h2 id="package-title" className="text-[14px] font-medium text-ink">
-            RepriseOS package
-          </h2>
-          <div className="mt-2 text-[13px] text-body" role="status">
-            {loading ? (
-              <p>
+        {localPackage && (
+          <div className="mx-auto mt-5 max-w-125 text-left text-[13px] text-body">
+            <div role="status">
+              <p>Local package · {localPackage.version}</p>
+              <p className="mt-1 break-all">{localPackage.filename}</p>
+            </div>
+            <button
+              type="button"
+              className="mt-2 cursor-pointer rounded-sm py-1 text-[12px] text-muted underline-offset-4 outline-none hover:text-ink hover:underline focus-visible:ring-2 focus-visible:ring-focus/50 disabled:pointer-events-none disabled:opacity-50"
+              disabled={!!loading || choosingFirmware}
+              onClick={() => {
+                onSelectPackage(null);
+                setPackageError("");
+                appendSessionLog("Automatic package download selected.");
+              }}
+            >
+              Use automatic download
+            </button>
+          </div>
+        )}
+        <HelpDisclosure label={localPackage ? "Change local package" : "Use a local package"}>
+          <Button.Root
+            size="compact"
+            disabled={!!loading || choosingFirmware}
+            onClick={choosePackage}
+          >
+            <Button.Label>Choose package…</Button.Label>
+          </Button.Root>
+        </HelpDisclosure>
+        <div className="mx-auto max-w-125 text-left">
+          <div role="status" aria-atomic="true">
+            {loading && (
+              <p className="mt-4 flex items-center gap-2 text-[13px] text-body">
+                <CheckStatusIndicator status="checking" />
                 {loading === "choose"
                   ? "Loading local package…"
                   : localPackage
                     ? "Preparing package…"
-                    : "Downloading and verifying package…"}
+                    : "Downloading and verifying RepriseOS…"}
               </p>
-            ) : localPackage ? (
-              <React.Fragment>
-                <p>Version {localPackage.version}</p>
-                <p className="mt-1 break-all">{localPackage.filename}</p>
-              </React.Fragment>
-            ) : (
-              <p>The release will download automatically when you continue.</p>
             )}
           </div>
-          <div className="mt-2 flex flex-wrap gap-4">
-            <button
-              type="button"
-              className="cursor-pointer rounded-sm py-1 text-[12px] text-muted underline-offset-4 outline-none hover:text-ink hover:underline focus-visible:ring-2 focus-visible:ring-focus/50 disabled:pointer-events-none disabled:opacity-50"
-              disabled={!!loading || choosingFirmware}
-              onClick={choosePackage}
-            >
-              {localPackage ? "Change package…" : "Alternatively, choose a local package…"}
-            </button>
-            {localPackage && (
-              <button
-                type="button"
-                className="cursor-pointer rounded-sm py-1 text-[12px] text-muted underline-offset-4 outline-none hover:text-ink hover:underline focus-visible:ring-2 focus-visible:ring-focus/50 disabled:pointer-events-none disabled:opacity-50"
-                disabled={!!loading || choosingFirmware}
-                onClick={() => {
-                  onSelectPackage(null);
-                  setPackageError("");
-                  appendSessionLog("Automatic package download selected.");
-                }}
-              >
-                Use download
-              </button>
-            )}
-          </div>
-          <div role="alert" className="mt-2 text-[12px] leading-6 text-[#aa3e36] empty:mt-0">
+          <div role="alert" className="mt-3 text-[12px] leading-6 text-[#aa3e36] empty:mt-0">
             {packageError}
           </div>
-        </section>
+        </div>
       </ScreenReveal>
       <ScreenReveal delay={0.16}>
         <InstallerScreen.Actions>
@@ -219,7 +212,9 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
             disabled={!file || !!error || !!loading || choosingFirmware}
             onClick={continueSetup}
           >
-            <Button.Label>Continue</Button.Label>
+            <Button.Label>
+              {loading === "prepare" ? (localPackage ? "Preparing…" : "Downloading…") : "Continue"}
+            </Button.Label>
           </Button.Root>
         </InstallerScreen.Actions>
       </ScreenReveal>
