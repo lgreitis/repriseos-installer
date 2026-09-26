@@ -23,7 +23,7 @@ const SuccessScreen: React.FC<ISuccessScreenProps> = ({ onDone }) => {
         <SuccessSymbol />
       </div>
       <InstallerScreen.Title id="success-title" ref={headingRef} tabIndex={-1}>
-        Installation sent.
+        You’re all set.
       </InstallerScreen.Title>
       <InstallerScreen.Description className="max-w-125">
         Your iPod will restart. Once it restarts, disconnect USB.
