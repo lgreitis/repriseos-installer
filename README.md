@@ -1,15 +1,16 @@
 # RepriseOS Installer
 
-Tauri + React desktop app for installing RepriseOS on iPod. Validates firmware,
-backs up NOR/SysCfg, assembles and uploads RepriseOS, and installs the bootloader.
+Desktop app for installing RepriseOS, an enhanced version of Apple's original
+iPod firmware. Validates firmware, backs up NOR/SysCfg, applies patches, uploads
+RepriseOS, and installs the bootloader.
 Backups and installation logs stay in the application's data directory.
 
 > Current support: iPod Classic 7G Rev B, Apple 2.0.4, FAT32. Support for more models is planned.
 
 ## Run
 
-Requires Node.js, pnpm, Rust, the Tauri platform prerequisites, libusb, and
-pkg-config. Cargo fetches the shared Rust crates from
+Built with Tauri and React. Requires Node.js, pnpm, Rust, the Tauri platform
+prerequisites, libusb, and pkg-config. Cargo fetches the shared Rust crates from
 [osos-lab](https://github.com/lgreitis/osos-lab), using the revision in `Cargo.lock`.
 
 ```sh
