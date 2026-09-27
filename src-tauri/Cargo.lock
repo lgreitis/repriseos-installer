@@ -2816,6 +2816,7 @@ dependencies = [
  "reprise-bundle",
  "reprise-device",
  "reqwest 0.12.28",
+ "rusb",
  "serde",
  "serde_json",
  "tauri",

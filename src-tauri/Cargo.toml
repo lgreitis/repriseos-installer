@@ -15,6 +15,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 reprise-bundle = { git = "https://github.com/lgreitis/osos-lab.git" }
 reprise-device = { git = "https://github.com/lgreitis/osos-lab.git" }
+# Build reprise-device's libusb dependency for each target architecture.
+rusb = { version = "0.9.4", features = ["vendored"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
