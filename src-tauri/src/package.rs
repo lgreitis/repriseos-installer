@@ -79,6 +79,16 @@ fn package_info(bundle: &VerifiedBundle, filename: Option<String>) -> Result<Pac
             return Err(format!("Package is missing the {component} component."));
         }
     }
+    reprise_device::UploadHelper::from_bytes(
+        bundle
+            .file("usb_helper", "image")
+            .map_err(|e| e.to_string())?,
+        bundle
+            .file("usb_helper", "descriptor")
+            .map_err(|e| e.to_string())?,
+    )
+    .and_then(|helper| helper.validate_platform())
+    .map_err(|e| e.to_string())?;
     Ok(PackageInfo {
         version: bundle.manifest().version.clone(),
         digest: bundle.digest().to_owned(),

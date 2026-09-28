@@ -91,6 +91,7 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           generateReleaseNotes: true
           uploadUpdaterJson: false
+          uploadPlainBinary: ${{ runner.os == 'Windows' }}
           uploadWorkflowArtifacts: true
       - name: Remove notarization key
         if: always() && runner.os == 'macOS'
