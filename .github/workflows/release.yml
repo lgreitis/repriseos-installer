@@ -111,6 +111,7 @@ jobs:
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           generateReleaseNotes: true
+          releaseAssetNamePattern: '[mainBinaryName]_[platform]_[arch][setup][ext]'
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           uploadPlainBinary: ${{ runner.os == 'Windows' }}
@@ -124,14 +125,22 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     steps:
-      - name: Verify complete update feed
+      - name: Verify update feed and website downloads
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets > release.json
           python3 - <<'PYTHON'
           import json, os
+          assets = {asset["name"] for asset in json.load(open("release.json"))["assets"]}
+          required = {
+              "repriseos-installer_darwin_universal.dmg",
+              "repriseos-installer_windows_x64-setup.exe",
+              "repriseos-installer_windows_x64.exe",
+          }
+          assert required <= assets, f"Missing website downloads: {required - assets}"
           feed = json.load(open("latest.json"))
           tag = os.environ["RELEASE_TAG"]
           assert feed["version"].removeprefix("v") == tag.removeprefix("v")

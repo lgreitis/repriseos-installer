@@ -32,3 +32,7 @@ pnpm tauri build
 pnpm check
 cargo test --manifest-path src-tauri/Cargo.toml -j 8
 ```
+
+## Support
+
+♥ [Support on Ko-fi](https://ko-fi.com/lgreitis). Help fund my questionable iPod purchases.
