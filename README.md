@@ -5,7 +5,10 @@ iPod firmware. Validates firmware, backs up NOR/SysCfg, applies patches, uploads
 RepriseOS, and installs the bootloader.
 Backups and installation logs stay in the application's data directory.
 
-> Current support: iPod Classic 7G Rev B, Apple 2.0.4, FAT32. Support for more models is planned.
+Current support (FAT32 storage required):
+
+- iPod Classic 6.5G / Rev A: MB562 and MB565, Apple firmware 2.0.1.
+- iPod Classic 7G / Rev B: MC293 and MC297, Apple firmware 2.0.4.
 
 ## Run
 
