@@ -127,7 +127,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Verify update feed and website downloads
+      - name: Normalize and verify update feed and website downloads
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
@@ -136,8 +136,10 @@ jobs:
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets > release.json
           python3 - <<'PYTHON'
           import json, os
-          from urllib.parse import unquote
-          assets = {asset["name"] for asset in json.load(open("release.json"))["assets"]}
+          from urllib.parse import quote, unquote
+          release_assets = json.load(open("release.json"))["assets"]
+          assets = {asset["name"] for asset in release_assets}
+          api_assets = {asset["apiUrl"]: asset["name"] for asset in release_assets}
           required = {
               "repriseos-installer_darwin_universal.dmg",
               "repriseos-installer_darwin_universal.app.tar.gz",
@@ -151,11 +153,19 @@ jobs:
           tag = os.environ["RELEASE_TAG"]
           assert feed["version"].removeprefix("v") == tag.removeprefix("v")
           prefix = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/{tag}/"
+          for target, platform in feed["platforms"].items():
+              name = api_assets.get(platform["url"])
+              if name is not None:
+                  platform["url"] = prefix + quote(name, safe="")
+              assert platform["url"].startswith(prefix), f"Invalid updater URL: {target}"
+              assert unquote(platform["url"].removeprefix(prefix)) in assets, target
+              assert platform["signature"], target
           for target in ("darwin-aarch64", "darwin-x86_64", "windows-x86_64"):
               platform = feed["platforms"].get(target + "-nsis") if target.startswith("windows") else None
               platform = platform or feed["platforms"].get(target)
               assert platform, f"Missing updater platform: {target}"
-              assert platform["url"].startswith(prefix), target
-              assert unquote(platform["url"].removeprefix(prefix)) in assets, target
-              assert platform["signature"], target
+          with open("latest.json", "w") as output:
+              json.dump(feed, output, indent=2)
+              output.write("\n")
           PYTHON
+          gh release upload "$RELEASE_TAG" latest.json --repo "$GITHUB_REPOSITORY" --clobber
