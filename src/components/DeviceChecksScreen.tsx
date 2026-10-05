@@ -1,5 +1,6 @@
 import React from "react";
 import { useHeadingFocus } from "../hooks/useHeadingFocus";
+import { describeCheckFailure } from "../lib/checkFailure";
 import {
   type Check,
   type CheckId,
@@ -16,13 +17,14 @@ import { InstallerScreen } from "./ui/InstallerScreen";
 interface IDeviceChecksScreenProps {
   onContinue: () => void;
   onBack: () => void;
+  onStart: () => void;
   onChangeFirmware: () => void;
 }
 
 const groups: { id: string; label: string; checks: CheckId[] }[] = [
   { id: "connection", label: "iPod connection", checks: ["usb", "access", "dfu"] },
   { id: "compatibility", label: "iPod compatibility", checks: ["rom", "model"] },
-  { id: "firmware", label: "Recorded firmware", checks: ["version"] },
+  { id: "firmware", label: "Apple firmware", checks: ["version"] },
 ];
 
 const labels: Record<CheckId, string> = {
@@ -46,6 +48,7 @@ function groupStatus(checks: Check[]): CheckStatus {
 const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
   onContinue,
   onBack,
+  onStart,
   onChangeFirmware,
 }) => {
   const { checks, running, report, error, progress, device, reconnecting, replacement } =
@@ -59,9 +62,11 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
     report?.compatible === true &&
     report.cleanup.state === "idle";
   const current = checks.find((check) => check.status === "running");
+  const failure =
+    !running && !reconnecting && !replacement ? describeCheckFailure(report, error) : null;
   const results: Record<string, string> = {
     connection: "Connected",
-    compatibility: report?.identity ? `${report.identity.model} · Rev B` : "Supported",
+    compatibility: report?.identity?.model ?? "Supported",
     firmware: report?.identity?.recorded_firmware ?? "Supported",
   };
 
@@ -73,7 +78,7 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
           : complete
             ? "Checks complete."
             : error
-              ? "Couldn’t complete the checks."
+              ? (failure?.title ?? "Couldn’t complete the checks.")
               : "Checking your iPod."}
       </InstallerScreen.Title>
       <CheckList.Root className="mt-9 max-w-124" aria-label="Device checks">
@@ -105,7 +110,7 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
             : complete
               ? "All checks passed. Continue is available."
               : error
-                ? "Checks stopped. Review the error and try again."
+                ? (failure?.message ?? "Checks stopped. Review the error and try again.")
                 : current
                   ? `Checking ${labels[current.id]}.`
                   : "Finishing checks…"}
@@ -115,13 +120,12 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
           An iPod is connected. Confirm it’s the one you want to check.
         </p>
       )}
-      {error && !replacement && (
-        <p
-          className="mx-auto mt-5 max-w-124 break-words text-[13px] leading-6 text-[#aa3e36]"
-          role="alert"
-        >
-          {error}
-        </p>
+      {failure && (
+        <div className="mx-auto mt-5 max-w-124 text-[13px] leading-6 text-body" role="alert">
+          <p className={failure.action === "retry" ? "break-words text-[#aa3e36]" : "break-words"}>
+            {failure.message}
+          </p>
+        </div>
       )}
       <HelpDisclosure label="Check details">
         <dl className="space-y-3">
@@ -150,13 +154,20 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
           )}
         </dl>
       </HelpDisclosure>
-      {error && !running && !reconnecting && (
-        <Button.Root className="mt-5" size="compact" onClick={onChangeFirmware}>
-          <Button.Label>Change firmware</Button.Label>
-        </Button.Root>
-      )}
       <InstallerScreen.Actions className="mt-7 min-h-12">
-        {error || replacement ? (
+        {failure?.action === "another-ipod" ? (
+          <Button.Root onClick={onBack}>
+            <Button.Label>Check another iPod</Button.Label>
+          </Button.Root>
+        ) : failure?.action === "start" ? (
+          <Button.Root onClick={onStart}>
+            <Button.Label>Back to start</Button.Label>
+          </Button.Root>
+        ) : failure?.action === "firmware" ? (
+          <Button.Root onClick={onChangeFirmware}>
+            <Button.Label>Change firmware</Button.Label>
+          </Button.Root>
+        ) : error || replacement ? (
           <React.Fragment>
             <Button.Root disabled={reconnecting} onClick={onBack}>
               <Button.Label>DFU guide</Button.Label>

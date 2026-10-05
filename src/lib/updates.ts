@@ -1,4 +1,4 @@
-import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
+import { backendAvailable, createChannel, invoke } from "./backend.ts";
 import { errorDetail } from "./deviceChecks.ts";
 
 export interface UpdateInfo {
@@ -55,7 +55,7 @@ export function dismissUpdate() {
 
 export async function checkInstallerUpdate() {
   if (state.status === "checking" || updateIsBusy(state.status)) return;
-  if (!isTauri()) {
+  if (!backendAvailable()) {
     publish({ ...state, status: "disabled" });
     return;
   }
@@ -81,7 +81,7 @@ export async function installInstallerUpdate() {
     return;
   publish({ ...state, status: "downloading", progress: null, error: null });
   try {
-    const channel = new Channel<UpdateProgress>();
+    const channel = createChannel<UpdateProgress>();
     channel.onmessage = (event) => {
       if (!updateIsBusy(state.status)) return;
       publish({

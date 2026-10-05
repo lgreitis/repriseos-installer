@@ -6,6 +6,15 @@ use std::sync::{
 };
 use tauri::{ipc::Channel, State};
 
+mod compatibility;
+
+#[derive(Serialize)]
+pub struct CheckResponse {
+    #[serde(flatten)]
+    report: CheckReport,
+    issue: Option<compatibility::CompatibilityIssue>,
+}
+
 #[derive(Default)]
 pub struct UsbState {
     busy: Arc<AtomicBool>,
@@ -72,7 +81,7 @@ pub async fn check_device(
     on_event: Channel<Event>,
     state: State<'_, UsbState>,
     app: tauri::AppHandle,
-) -> Result<CheckReport, CommandError> {
+) -> Result<CheckResponse, CommandError> {
     use tauri::Manager;
     let operation = state.acquire()?;
     state
@@ -138,7 +147,8 @@ pub async fn check_device(
                 report: report.clone(),
             });
         }
-        Ok(report)
+        let issue = compatibility::issue_for_report(&report);
+        Ok(CheckResponse { report, issue })
     })
     .await
     .map_err(|e| CommandError::new(CheckId::Usb, e))?

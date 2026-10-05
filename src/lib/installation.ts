@@ -1,4 +1,4 @@
-import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
+import { backendAvailable, createChannel, invoke } from "./backend.ts";
 import { errorDetail } from "./deviceChecks.ts";
 import { appendSessionLog } from "./sessionLog.ts";
 
@@ -11,8 +11,8 @@ export interface FirmwareInfo {
 export function chooseFirmware(
   onSelected: (filename: string) => void,
 ): Promise<FirmwareInfo | null> {
-  if (!isTauri()) return Promise.reject("Open the desktop installer to select firmware.");
-  const channel = new Channel<string>();
+  if (!backendAvailable()) return Promise.reject("Open the desktop installer to select firmware.");
+  const channel = createChannel<string>();
   channel.onmessage = onSelected;
   return invoke("choose_firmware", { onSelected: channel });
 }
@@ -90,8 +90,8 @@ export function startInstallation(firmware: FirmwareInfo, packageDigest: string)
   const jobId = ++nextJobId;
   let lastDetail = "";
   const run = async () => {
-    if (!isTauri()) throw new Error("Open the desktop installer to install RepriseOS.");
-    const channel = new Channel<InstallEvent>();
+    if (!backendAvailable()) throw new Error("Open the desktop installer to install RepriseOS.");
+    const channel = createChannel<InstallEvent>();
     channel.onmessage = (event) => {
       if (!state.running || jobId !== nextJobId) return;
       if (event.detail !== lastDetail) {

@@ -16,14 +16,25 @@ import { appendSessionLog, getSessionLog, subscribeToSessionLog } from "./lib/se
 import { getUpdateState, subscribeToUpdates, updateIsBusy } from "./lib/updates";
 import "./App.css";
 
-type Screen = "main" | "disclaimer" | "firmware" | "dfu" | "checks" | "installation" | "success";
+export type Screen =
+  | "main"
+  | "disclaimer"
+  | "firmware"
+  | "dfu"
+  | "checks"
+  | "installation"
+  | "success";
 
-const App: React.FC = () => {
+interface AppProps {
+  initial?: { screen: Screen; firmware: FirmwareInfo | null; packageDigest: string };
+}
+
+const App: React.FC<AppProps> = ({ initial }) => {
   const updater = React.useSyncExternalStore(subscribeToUpdates, getUpdateState);
-  const [screen, setScreen] = React.useState<Screen>("main");
-  const [firmware, setFirmware] = React.useState<FirmwareInfo | null>(null);
+  const [screen, setScreen] = React.useState<Screen>(initial?.screen ?? "main");
+  const [firmware, setFirmware] = React.useState<FirmwareInfo | null>(initial?.firmware ?? null);
   const [localPackage, setLocalPackage] = React.useState<PackageInfo | null>(null);
-  const [packageDigest, setPackageDigest] = React.useState("");
+  const [packageDigest, setPackageDigest] = React.useState(initial?.packageDigest ?? "");
   const logs = React.useSyncExternalStore(subscribeToSessionLog, getSessionLog);
   const reducedMotion = useReducedMotion();
   const scrollRef = React.useRef<HTMLElement>(null);
@@ -100,6 +111,7 @@ const App: React.FC = () => {
               <DeviceChecksScreen
                 onContinue={beginInstall}
                 onBack={() => setScreen("dfu")}
+                onStart={() => setScreen("main")}
                 onChangeFirmware={() => {
                   setPackageDigest("");
                   setScreen("firmware");
@@ -117,6 +129,14 @@ const App: React.FC = () => {
         </AnimatePresence>
       </div>
       <DebugLog entries={logs} />
+      {import.meta.env.DEV && !initial && screen === "main" && !updateIsBusy(updater.status) && (
+        <a
+          href="?dev-panel"
+          className="fixed bottom-3 left-3 rounded border border-black/20 bg-white px-3 py-2 text-xs text-black"
+        >
+          Dev panel
+        </a>
+      )}
     </main>
   );
 };

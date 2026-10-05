@@ -27,7 +27,7 @@ jobs:
           - runner: macos-15
             target: universal-apple-darwin
             rust-targets: aarch64-apple-darwin x86_64-apple-darwin
-            bundles: dmg
+            bundles: app,dmg
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
             rust-targets: x86_64-pc-windows-msvc
@@ -124,6 +124,8 @@ jobs:
     needs: build
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - name: Verify update feed and website downloads
         env:
@@ -134,20 +136,26 @@ jobs:
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets > release.json
           python3 - <<'PYTHON'
           import json, os
+          from urllib.parse import unquote
           assets = {asset["name"] for asset in json.load(open("release.json"))["assets"]}
           required = {
               "repriseos-installer_darwin_universal.dmg",
+              "repriseos-installer_darwin_universal.app.tar.gz",
+              "repriseos-installer_darwin_universal.app.tar.gz.sig",
               "repriseos-installer_windows_x64-setup.exe",
+              "repriseos-installer_windows_x64-setup.exe.sig",
               "repriseos-installer_windows_x64.exe",
           }
-          assert required <= assets, f"Missing website downloads: {required - assets}"
+          assert required <= assets, f"Missing release assets: {required - assets}"
           feed = json.load(open("latest.json"))
           tag = os.environ["RELEASE_TAG"]
           assert feed["version"].removeprefix("v") == tag.removeprefix("v")
           prefix = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/{tag}/"
           for target in ("darwin-aarch64", "darwin-x86_64", "windows-x86_64"):
               platform = feed["platforms"].get(target + "-nsis") if target.startswith("windows") else None
-              platform = platform or feed["platforms"][target]
+              platform = platform or feed["platforms"].get(target)
+              assert platform, f"Missing updater platform: {target}"
               assert platform["url"].startswith(prefix), target
+              assert unquote(platform["url"].removeprefix(prefix)) in assets, target
               assert platform["signature"], target
           PYTHON

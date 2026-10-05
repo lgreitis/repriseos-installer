@@ -2876,8 +2876,8 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "reprise-bundle"
-version = "0.1.0"
-source = "git+https://github.com/lgreitis/osos-lab.git#8688a990cbfe23bd5df5c0db64a408616e28434a"
+version = "0.1.1"
+source = "git+https://github.com/lgreitis/osos-lab.git#f06e417460d2376527c4bf02853927f6157c5351"
 dependencies = [
  "ed25519-dalek",
  "mu_uefi_decompress",
@@ -2895,8 +2895,8 @@ dependencies = [
 
 [[package]]
 name = "reprise-device"
-version = "0.1.0"
-source = "git+https://github.com/lgreitis/osos-lab.git#8688a990cbfe23bd5df5c0db64a408616e28434a"
+version = "0.1.1"
+source = "git+https://github.com/lgreitis/osos-lab.git#f06e417460d2376527c4bf02853927f6157c5351"
 dependencies = [
  "getrandom 0.3.4",
  "rusb",

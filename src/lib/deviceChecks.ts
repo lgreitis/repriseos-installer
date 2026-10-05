@@ -1,4 +1,4 @@
-import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
+import { backendAvailable, createChannel, invoke } from "./backend.ts";
 import { appendSessionLog } from "./sessionLog.ts";
 
 export interface DeviceSelector {
@@ -29,7 +29,13 @@ export interface CheckReport {
   compatible: boolean;
   cleanup: { state: "not_attempted" | "idle" | "failed"; detail?: string };
   identity: { model: string; serial: string; recorded_firmware: string } | null;
+  issue: CompatibilityIssue | null;
 }
+
+export type CompatibilityIssue =
+  | { kind: "unsupported_model"; model: string }
+  | { kind: "unsupported_firmware"; detected: string; required_versions: string[] }
+  | { kind: "package_mismatch"; model: string };
 
 type CheckEvent =
   | ({ event: "check" } & Check)
@@ -83,7 +89,7 @@ export function errorDetail(error: unknown): string {
 
 let discovery: Promise<DeviceInfo[]> | null = null;
 export function discoverDevices(): Promise<DeviceInfo[]> {
-  if (!isTauri()) return Promise.reject("Open the desktop installer to detect your iPod.");
+  if (!backendAvailable()) return Promise.reject("Open the desktop installer to detect your iPod.");
   discovery ??= invoke<DeviceInfo[]>("discover_devices").finally(() => {
     discovery = null;
   });
@@ -112,7 +118,7 @@ export function startDeviceChecks(device: DeviceInfo) {
     error: null,
   });
   const run = async () => {
-    const channel = new Channel<CheckEvent>();
+    const channel = createChannel<CheckEvent>();
     channel.onmessage = (event) => {
       if (state.jobId !== jobId || !state.running) return;
       if (event.event === "check") {
