@@ -62,7 +62,7 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
     setLoading("prepare");
     setPackageError("");
     try {
-      const selected = await preparePackage(localPackage);
+      const selected = await preparePackage(file.sha256, localPackage);
       appendSessionLog(`Package ready: ${selected.version} (${selected.digest}).`);
       onContinue(selected.digest);
     } catch (error) {

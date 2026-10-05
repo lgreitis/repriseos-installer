@@ -79,15 +79,7 @@ fn run(
     package_digest: String,
     channel: Channel<InstallEvent>,
 ) -> Result<InstallResult> {
-    let ipsw = app
-        .state::<FirmwareState>()
-        .0
-        .lock()
-        .map_err(|e| e.to_string())?
-        .as_ref()
-        .filter(|f| f.sha256 == firmware_sha256)
-        .cloned()
-        .ok_or("Choose the IPSW again.")?;
+    let ipsw = app.state::<FirmwareState>().selected(&firmware_sha256)?;
     let bundle = app
         .state::<PackageState>()
         .0
@@ -97,6 +89,7 @@ fn run(
         .filter(|b| b.digest() == package_digest)
         .cloned()
         .ok_or("Choose the package again.")?;
+    crate::package::require_target(&bundle.manifest().compatibility, ipsw.metadata.target()?)?;
     let helper = UploadHelper::from_bytes(
         bundle.file("usb_helper", "image")?,
         bundle.file("usb_helper", "descriptor")?,
@@ -117,13 +110,7 @@ fn run(
         .identity
         .as_ref()
         .ok_or("Missing checked device identity.")?;
-    let target = &bundle.manifest().compatibility;
-    if !target.models.contains(&identity.model)
-        || target.hardware_version != identity.hardware_version
-        || target.apple_firmware != identity.recorded_firmware
-    {
-        return Err("The package is incompatible with this iPod.".into());
-    }
+    crate::package::require_device(&bundle.manifest().compatibility, &checked.report)?;
     let data = app.path().app_data_dir()?;
     let directory = job::backup_directory(&data, &identity.hardware_id)?;
     job::save_json(&directory.join("device.json"), &checked.report)?;

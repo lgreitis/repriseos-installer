@@ -2,11 +2,14 @@ mod device;
 mod firmware;
 mod install;
 mod package;
+mod updates;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::UpdateState::default())
         .manage(device::UsbState::default())
         .manage(package::PackageState::default())
         .manage(firmware::FirmwareState::default())
@@ -18,6 +21,10 @@ pub fn run() {
                     .state::<install::InstallState>()
                     .running
                     .load(std::sync::atomic::Ordering::Acquire)
+                    || window
+                        .state::<updates::UpdateState>()
+                        .installing
+                        .load(std::sync::atomic::Ordering::Acquire)
                 {
                     api.prevent_close();
                 }
@@ -30,6 +37,9 @@ pub fn run() {
             package::prepare_package,
             firmware::choose_firmware,
             install::install,
+            updates::check_installer_update,
+            updates::install_installer_update,
+            updates::open_installer_download,
             install::cancel_install
         ])
         .build(tauri::generate_context!())
@@ -41,6 +51,10 @@ pub fn run() {
                     .state::<install::InstallState>()
                     .running
                     .load(std::sync::atomic::Ordering::Acquire)
+                    || app
+                        .state::<updates::UpdateState>()
+                        .installing
+                        .load(std::sync::atomic::Ordering::Acquire)
                 {
                     api.prevent_exit();
                 }

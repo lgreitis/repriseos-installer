@@ -5,6 +5,7 @@ import { DfuScreen } from "./components/DfuScreen";
 import { DisclaimerScreen } from "./components/DisclaimerScreen";
 import { FirmwareScreen } from "./components/FirmwareScreen";
 import { InstallationScreen } from "./components/InstallationScreen";
+import { InstallerUpdates } from "./components/InstallerUpdates";
 import { MainScreen } from "./components/MainScreen";
 import { SuccessScreen } from "./components/SuccessScreen";
 import { DebugLog } from "./components/ui/DebugLog";
@@ -12,11 +13,13 @@ import { startDeviceChecks } from "./lib/deviceChecks";
 import { type FirmwareInfo, startInstallation } from "./lib/installation";
 import type { PackageInfo } from "./lib/package";
 import { appendSessionLog, getSessionLog, subscribeToSessionLog } from "./lib/sessionLog";
+import { getUpdateState, subscribeToUpdates, updateIsBusy } from "./lib/updates";
 import "./App.css";
 
 type Screen = "main" | "disclaimer" | "firmware" | "dfu" | "checks" | "installation" | "success";
 
 const App: React.FC = () => {
+  const updater = React.useSyncExternalStore(subscribeToUpdates, getUpdateState);
   const [screen, setScreen] = React.useState<Screen>("main");
   const [firmware, setFirmware] = React.useState<FirmwareInfo | null>(null);
   const [localPackage, setLocalPackage] = React.useState<PackageInfo | null>(null);
@@ -50,6 +53,8 @@ const App: React.FC = () => {
           >
             {screen === "main" ? (
               <MainScreen
+                updates={<InstallerUpdates />}
+                installDisabled={updateIsBusy(updater.status)}
                 onInstall={() => {
                   appendSessionLog("New setup started.");
                   setFirmware(null);
@@ -92,7 +97,14 @@ const App: React.FC = () => {
                 }}
               />
             ) : screen === "checks" ? (
-              <DeviceChecksScreen onContinue={beginInstall} onBack={() => setScreen("dfu")} />
+              <DeviceChecksScreen
+                onContinue={beginInstall}
+                onBack={() => setScreen("dfu")}
+                onChangeFirmware={() => {
+                  setPackageDigest("");
+                  setScreen("firmware");
+                }}
+              />
             ) : screen === "installation" ? (
               <InstallationScreen
                 onComplete={() => setScreen("success")}

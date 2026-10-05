@@ -37,6 +37,8 @@ jobs:
         shell: bash
     env:
       CARGO_BUILD_JOBS: '8'
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       APPLE_CERTIFICATE: ${{ startsWith(matrix.runner, 'macos-') && secrets.APPLE_CERTIFICATE || '' }}
       APPLE_CERTIFICATE_PASSWORD: ${{ startsWith(matrix.runner, 'macos-') && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
       APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.runner, 'macos-') && secrets.APPLE_SIGNING_IDENTITY || '' }}
@@ -46,6 +48,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Check updater signing key
+        run: |
+          if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" ]]; then
+            echo "::error::Set TAURI_SIGNING_PRIVATE_KEY in the installer-release environment."
+            exit 1
+          fi
+      - name: Check release version
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, pathlib, re
+          version = os.environ["RELEASE_TAG"].removeprefix("v")
+          for path in ("package.json", "src-tauri/tauri.conf.json"):
+              assert json.loads(pathlib.Path(path).read_text())["version"] == version, path
+          cargo = pathlib.Path("src-tauri/Cargo.toml").read_text()
+          assert re.search(r'^version = "([^"]+)"', cargo, re.M)[1] == version, "Cargo.toml"
+          PYTHON
       - name: Prepare macOS signing credentials
         if: runner.os == 'macOS'
         env:
@@ -90,9 +111,34 @@ jobs:
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           generateReleaseNotes: true
-          uploadUpdaterJson: false
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
           uploadPlainBinary: ${{ runner.os == 'Windows' }}
           uploadWorkflowArtifacts: true
       - name: Remove notarization key
         if: always() && runner.os == 'macOS'
         run: rm -f "$RUNNER_TEMP/repriseos-notary-key.p8"
+
+  verify-updater:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Verify complete update feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern latest.json
+          python3 - <<'PYTHON'
+          import json, os
+          feed = json.load(open("latest.json"))
+          tag = os.environ["RELEASE_TAG"]
+          assert feed["version"].removeprefix("v") == tag.removeprefix("v")
+          prefix = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/{tag}/"
+          for target in ("darwin-aarch64", "darwin-x86_64", "windows-x86_64"):
+              platform = feed["platforms"].get(target + "-nsis") if target.startswith("windows") else None
+              platform = platform or feed["platforms"][target]
+              assert platform["url"].startswith(prefix), target
+              assert platform["signature"], target
+          PYTHON

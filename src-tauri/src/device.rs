@@ -82,6 +82,15 @@ pub async fn check_device(
         .take();
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
+        let bundle = app
+            .state::<crate::package::PackageState>()
+            .0
+            .lock()
+            .map_err(|e| CommandError::new(CheckId::Version, e))?
+            .clone()
+            .ok_or_else(|| {
+                CommandError::new(CheckId::Version, "Choose a firmware package first.")
+            })?;
         let devices = reprise_device::discover().map_err(|e| CommandError::new(CheckId::Usb, e))?;
         if !devices
             .iter()
@@ -100,10 +109,26 @@ pub async fn check_device(
             };
             CommandError::new(stage, error)
         })?;
-        let report = session.check(|event| {
+        let mut report = session.check(|event| {
             // Finish cleanup even if the window stops receiving events.
             let _ = on_event.send(event);
         });
+        if report.compatible {
+            if let Err(detail) =
+                crate::package::require_device(&bundle.manifest().compatibility, &report)
+            {
+                report.compatible = false;
+                if let Some(check) = report
+                    .checks
+                    .iter_mut()
+                    .find(|check| check.id == CheckId::Version)
+                {
+                    check.status = reprise_device::CheckStatus::Failed;
+                    check.detail = detail;
+                    let _ = on_event.send(Event::Check(check.clone()));
+                }
+            }
+        }
         if report.compatible && report.cleanup == reprise_device::Cleanup::Idle {
             *app.state::<UsbState>()
                 .checked

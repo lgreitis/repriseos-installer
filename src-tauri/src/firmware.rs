@@ -7,6 +7,18 @@ use tauri_plugin_dialog::DialogExt;
 #[derive(Default)]
 pub struct FirmwareState(pub Mutex<Option<Arc<Ipsw>>>);
 
+impl FirmwareState {
+    pub fn selected(&self, sha256: &str) -> Result<Arc<Ipsw>, String> {
+        self.0
+            .lock()
+            .map_err(|e| e.to_string())?
+            .as_ref()
+            .filter(|ipsw| ipsw.sha256 == sha256)
+            .cloned()
+            .ok_or_else(|| "Choose the IPSW again.".into())
+    }
+}
+
 #[derive(Serialize)]
 pub struct FirmwareInfo {
     filename: String,

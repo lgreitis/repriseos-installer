@@ -5,9 +5,11 @@ import { InstallerScreen } from "./ui/InstallerScreen";
 
 interface IMainScreenProps {
   onInstall: () => void;
+  installDisabled?: boolean;
+  updates: React.ReactNode;
 }
 
-const MainScreen: React.FC<IMainScreenProps> = ({ onInstall }) => {
+const MainScreen: React.FC<IMainScreenProps> = ({ onInstall, installDisabled, updates }) => {
   const { headingRef } = useHeadingFocus();
 
   return (
@@ -20,9 +22,11 @@ const MainScreen: React.FC<IMainScreenProps> = ({ onInstall }) => {
           title="Install RepriseOS"
           description="Set up your iPod for the first time."
           onClick={onInstall}
+          disabled={installDisabled}
         />
         <ChoiceButton disabled title="Update RepriseOS" description="Not available yet." />
       </InstallerScreen.Actions>
+      {updates}
     </InstallerScreen.Root>
   );
 };

@@ -16,6 +16,7 @@ import { InstallerScreen } from "./ui/InstallerScreen";
 interface IDeviceChecksScreenProps {
   onContinue: () => void;
   onBack: () => void;
+  onChangeFirmware: () => void;
 }
 
 const groups: { id: string; label: string; checks: CheckId[] }[] = [
@@ -42,7 +43,11 @@ function groupStatus(checks: Check[]): CheckStatus {
   return "pending";
 }
 
-const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({ onContinue, onBack }) => {
+const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
+  onContinue,
+  onBack,
+  onChangeFirmware,
+}) => {
   const { checks, running, report, error, progress, device, reconnecting, replacement } =
     React.useSyncExternalStore(subscribeToChecks, getCheckState);
   const { headingRef } = useHeadingFocus();
@@ -145,6 +150,11 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({ onContinue, on
           )}
         </dl>
       </HelpDisclosure>
+      {error && !running && !reconnecting && (
+        <Button.Root className="mt-5" size="compact" onClick={onChangeFirmware}>
+          <Button.Label>Change firmware</Button.Label>
+        </Button.Root>
+      )}
       <InstallerScreen.Actions className="mt-7 min-h-12">
         {error || replacement ? (
           <React.Fragment>

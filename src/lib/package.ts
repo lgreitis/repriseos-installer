@@ -11,7 +11,13 @@ export async function chooseLocalPackage(): Promise<PackageInfo | null> {
   return invoke<PackageInfo | null>("choose_local_package");
 }
 
-export async function preparePackage(localPackage: PackageInfo | null): Promise<PackageInfo> {
+export async function preparePackage(
+  firmwareSha256: string,
+  localPackage: PackageInfo | null,
+): Promise<PackageInfo> {
   if (!isTauri()) throw new Error("Open the desktop installer to load a package.");
-  return invoke<PackageInfo>("prepare_package", { localDigest: localPackage?.digest ?? null });
+  return invoke<PackageInfo>("prepare_package", {
+    firmwareSha256,
+    localDigest: localPackage?.digest ?? null,
+  });
 }

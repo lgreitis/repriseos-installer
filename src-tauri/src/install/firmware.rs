@@ -48,7 +48,7 @@ pub(super) fn assemble(
     job.stage("decrypt", "Preparing Apple firmware")?;
     let cache = data.join("firmware");
     fs::create_dir_all(&cache)?;
-    let cache_file = cache.join("osos-2.0.4.bin");
+    let cache_file = cache.join(format!("osos-{}.bin", ipsw.metadata.target()?.target));
     let osos = match fs::read(&cache_file) {
         Ok(image) => {
             job.emit("Verifying cached Apple firmware", None);
