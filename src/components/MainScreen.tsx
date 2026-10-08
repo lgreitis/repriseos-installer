@@ -19,12 +19,11 @@ const MainScreen: React.FC<IMainScreenProps> = ({ onInstall, installDisabled, up
       </InstallerScreen.Title>
       <InstallerScreen.Actions className="mx-auto mt-9 max-w-100 flex-col gap-3">
         <ChoiceButton
-          title="Install RepriseOS"
-          description="Set up your iPod for the first time."
+          title="Install/Update RepriseOS"
+          description="Install or update RepriseOS on your iPod."
           onClick={onInstall}
           disabled={installDisabled}
         />
-        <ChoiceButton disabled title="Update RepriseOS" description="Not available yet." />
       </InstallerScreen.Actions>
       {updates}
     </InstallerScreen.Root>
