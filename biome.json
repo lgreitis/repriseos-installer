@@ -33,11 +33,6 @@
   },
   "overrides": [
     {
-      "includes": ["src/assets/iPodClassic.svg"],
-      "formatter": { "enabled": false },
-      "linter": { "enabled": false }
-    },
-    {
       "includes": ["src/vite-env.d.ts"],
       "linter": { "rules": { "style": { "useFilenamingConvention": "off" } } }
     }

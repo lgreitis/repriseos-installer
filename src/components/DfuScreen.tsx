@@ -49,11 +49,7 @@ const DfuScreen: React.FC<IDfuScreenProps> = ({ onContinue }) => {
     setReady(false);
     const illustrationHeight = illustrationRef.current?.offsetHeight ?? 396;
     const rootTop = rootRef.current?.getBoundingClientRect().top ?? 0;
-    const introHeight = Math.min(
-      window.innerHeight * 0.8,
-      760,
-      (window.innerWidth - 48) * (729 / 443),
-    );
+    const introHeight = Math.min(window.innerHeight * 0.8, 760, window.innerWidth - 48);
 
     y.set(window.innerHeight / 2 - rootTop - illustrationHeight / 2);
     scale.set(Math.max(1, introHeight / illustrationHeight));

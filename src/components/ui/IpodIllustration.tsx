@@ -1,6 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import React from "react";
-import ipodClassic from "../../assets/iPodClassic.svg";
+import ipodClassic from "../../assets/iPodClassic.png";
 import { cn } from "../../lib/cn";
 
 interface IIpodIllustrationProps {
@@ -26,15 +26,15 @@ const IpodIllustration: React.FC<IIpodIllustrationProps> = ({
             ? "iPod classic with its Menu and center buttons highlighted in blue"
             : "iPod classic with its screen, Menu button, and center button visible"
         }
-        width={443.19766}
-        height={728.93097}
+        width={1024}
+        height={1024}
         draggable={false}
         onLoad={onLoad}
         className="block h-full w-auto"
       />
       {showHighlights && (
         <motion.svg
-          viewBox="0 0 443.19766 728.93097"
+          viewBox="0 0 1024 1024"
           className="pointer-events-none absolute inset-0 h-full w-full"
           aria-hidden="true"
           initial={{ opacity: reducedMotion ? 1 : 0 }}
@@ -57,14 +57,13 @@ const IpodIllustration: React.FC<IIpodIllustrationProps> = ({
                 : { delay: 0.4, duration: 2, repeat: Infinity, ease: "easeInOut" }
             }
           >
-            {/* Coordinates include the artwork's layer and Menu lettering transforms. */}
-            <g transform="translate(214.85 418.04)">
-              <circle r="50" fill={`url(#${glowId})`} />
-              <circle r="32" fill="#2997ff" fillOpacity="0.2" />
+            <g transform="translate(512 558)">
+              <circle r="67" fill={`url(#${glowId})`} />
+              <circle r="43" fill="#2997ff" fillOpacity="0.2" />
             </g>
-            <g transform="translate(214.81616 531.13194)">
-              <circle r="73" fill={`url(#${glowId})`} />
-              <circle r="49.08599" fill="#2997ff" fillOpacity="0.2" />
+            <g transform="translate(512 708)">
+              <circle r="98" fill={`url(#${glowId})`} />
+              <circle r="66" fill="#2997ff" fillOpacity="0.2" />
             </g>
           </motion.g>
         </motion.svg>
