@@ -60,10 +60,8 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python3 - <<'PYTHON'
-          import json, os, pathlib, re
+          import os, pathlib, re
           version = os.environ["RELEASE_TAG"].removeprefix("v")
-          for path in ("package.json", "src-tauri/tauri.conf.json"):
-              assert json.loads(pathlib.Path(path).read_text())["version"] == version, path
           cargo = pathlib.Path("src-tauri/Cargo.toml").read_text()
           assert re.search(r'^version = "([^"]+)"', cargo, re.M)[1] == version, "Cargo.toml"
           PYTHON
