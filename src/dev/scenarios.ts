@@ -12,6 +12,7 @@ export interface Scenario {
   issue?: CompatibilityIssue;
   cleanupFailure?: string;
   firmwareError?: string;
+  localPackage?: boolean;
   packageError?: string;
   installFailure?: { stage: string; detail: string };
   update?: "available" | "manual" | "current" | "check-error" | "download-error" | "installing";
@@ -106,6 +107,14 @@ export const scenarios: Scenario[] = [
     label: "DFU cleanup failed",
     screen: "checks",
     cleanupFailure: "The iPod did not return to idle DFU. Reconnect your iPod in DFU mode.",
+  },
+  {
+    id: "local-package",
+    group: "Firmware and downloads",
+    label: "Local package selected",
+    screen: "firmware",
+    localPackage: true,
+    hint: "Continue with the local package, change it, or switch to automatic download.",
   },
   {
     id: "invalid-ipsw",

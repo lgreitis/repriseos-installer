@@ -156,11 +156,28 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
             )}
           </AnimatePresence>
         </div>
-        {localPackage && (
-          <div className="mx-auto mt-5 max-w-125 text-left text-[13px] text-body">
-            <div role="status">
-              <p>Local package · {localPackage.version}</p>
-              <p className="mt-1 break-all">{localPackage.filename}</p>
+        {localPackage ? (
+          <section
+            aria-labelledby="package-title"
+            className="installer-well mx-auto mt-5 max-w-125 rounded-lg p-4 text-left"
+          >
+            <h2 id="package-title" className="mb-3 text-[13px] font-medium text-ink">
+              Local package
+            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0 flex-1 basis-48 text-[13px] text-body" role="status">
+                <p className="break-all">{localPackage.filename}</p>
+                <p className="mt-1 text-[12px] text-muted">
+                  Version {localPackage.version} · Local package
+                </p>
+              </div>
+              <Button.Root
+                size="compact"
+                disabled={!!loading || choosingFirmware}
+                onClick={choosePackage}
+              >
+                <Button.Label>Change…</Button.Label>
+              </Button.Root>
             </div>
             <button
               type="button"
@@ -174,17 +191,23 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
             >
               Use automatic download
             </button>
-          </div>
+          </section>
+        ) : (
+          <HelpDisclosure label="Use a local package">
+            <p>
+              A local package isn’t needed. The latest compatible RepriseOS package downloads
+              automatically when you continue. This option is intended for development and testing.
+            </p>
+            <Button.Root
+              className="mt-3"
+              size="compact"
+              disabled={!!loading || choosingFirmware}
+              onClick={choosePackage}
+            >
+              <Button.Label>Choose package…</Button.Label>
+            </Button.Root>
+          </HelpDisclosure>
         )}
-        <HelpDisclosure label={localPackage ? "Change local package" : "Use a local package"}>
-          <Button.Root
-            size="compact"
-            disabled={!!loading || choosingFirmware}
-            onClick={choosePackage}
-          >
-            <Button.Label>Choose package…</Button.Label>
-          </Button.Root>
-        </HelpDisclosure>
         <div className="mx-auto max-w-125 text-left">
           <div role="status" aria-atomic="true">
             {loading && (

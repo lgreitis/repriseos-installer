@@ -47,14 +47,14 @@ const InstallationScreen: React.FC<IInstallationScreenProps> = ({ onComplete, on
       <InstallerScreen.Title id="installation-title" ref={headingRef} tabIndex={-1}>
         {state.error ? "Installation stopped." : "Installing RepriseOS."}
       </InstallerScreen.Title>
-      <div className="mx-auto mt-10 max-w-112">
+      <div className="mx-auto mt-6 max-w-112">
         <InstallationProgress
           label={snapshot.label}
           value={snapshot.percentage}
           complete={snapshot.complete}
           stage={snapshot.id}
         />
-        <div className="mt-5 flex min-h-6 items-center justify-center gap-3 text-[13px] text-body">
+        <div className="mt-3 flex min-h-6 items-center justify-center gap-3 text-[13px] text-body">
           <div aria-live="polite" aria-atomic="true">
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
@@ -84,18 +84,19 @@ const InstallationScreen: React.FC<IInstallationScreenProps> = ({ onComplete, on
           {formatElapsedTime(elapsed)}
         </p>
       </div>
-      <p className="mt-8 min-h-10 text-[12px] leading-5 text-muted">
-        {state.running &&
-          (state.cancelling
+      {state.running && (
+        <p className="mt-4 text-[12px] leading-5 text-muted">
+          {state.cancelling
             ? "Finishing the current operation…"
-            : "Keep your iPod connected and your computer awake.")}
-      </p>
+            : "Keep your iPod connected and your computer awake."}
+        </p>
+      )}
       {state.error && (
         <p role="alert" className="mt-4 break-words text-[13px] leading-6 text-[#aa3e36]">
           {state.error}
         </p>
       )}
-      <InstallerScreen.Actions>
+      <InstallerScreen.Actions className="mt-6">
         {state.error ? (
           <Button.Root onClick={onRecover}>
             <Button.Label>DFU guide</Button.Label>

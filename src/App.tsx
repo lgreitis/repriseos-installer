@@ -26,14 +26,21 @@ export type Screen =
   | "success";
 
 interface AppProps {
-  initial?: { screen: Screen; firmware: FirmwareInfo | null; packageDigest: string };
+  initial?: {
+    screen: Screen;
+    firmware: FirmwareInfo | null;
+    packageDigest: string;
+    localPackage?: PackageInfo;
+  };
 }
 
 const App: React.FC<AppProps> = ({ initial }) => {
   const updater = React.useSyncExternalStore(subscribeToUpdates, getUpdateState);
   const [screen, setScreen] = React.useState<Screen>(initial?.screen ?? "main");
   const [firmware, setFirmware] = React.useState<FirmwareInfo | null>(initial?.firmware ?? null);
-  const [localPackage, setLocalPackage] = React.useState<PackageInfo | null>(null);
+  const [localPackage, setLocalPackage] = React.useState<PackageInfo | null>(
+    initial?.localPackage ?? null,
+  );
   const [packageDigest, setPackageDigest] = React.useState(initial?.packageDigest ?? "");
   const logs = React.useSyncExternalStore(subscribeToSessionLog, getSessionLog);
   const reducedMotion = useReducedMotion();

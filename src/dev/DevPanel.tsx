@@ -69,6 +69,9 @@ export function DevPanel() {
           screen: scenario.screen,
           firmware: scenario.firmwareError ? null : mockFirmware,
           packageDigest: mockPackage.digest,
+          localPackage: scenario.localPackage
+            ? { ...mockPackage, filename: "repriseos.zip" }
+            : undefined,
         }}
       />
     </div>
