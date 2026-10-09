@@ -22,28 +22,15 @@ export interface Scenario {
 export const scenarios: Scenario[] = [
   { id: "full-setup", group: "Setup", label: "Successful setup", screen: "main" },
   {
-    id: "firmware-required",
-    group: "Compatibility",
-    label: "Apple firmware 2.0.2",
-    screen: "checks",
-    issue: { kind: "unsupported_firmware", detected: "2.0.2", required_versions: ["2.0.4"] },
-    checkFailure: {
-      id: "version",
-      version: "2.0.2",
-      detail:
-        "Your iPod reports Apple firmware 2.0.2. RepriseOS requires Apple firmware 2.0.4 for this model. Install the required Apple firmware on your iPod, then try again.",
-    },
-  },
-  {
     id: "unsupported-model",
     group: "Compatibility",
     label: "Unsupported model",
     screen: "checks",
-    issue: { kind: "unsupported_model", model: "MB029" },
+    issue: { kind: "unsupported_model", model: "MA002" },
     checkFailure: {
       id: "model",
-      model: "MB029",
-      detail: "MB029; HwVr 0x00130000 (unsupported target)",
+      model: "MA002",
+      detail: "MA002; HwVr 0x000b0000 (unsupported target)",
     },
   },
   {
@@ -55,7 +42,7 @@ export const scenarios: Scenario[] = [
     checkFailure: {
       id: "version",
       detail:
-        "The selected firmware package does not support this MC293 iPod. Choose the IPSW and package for this model.",
+        "The selected firmware package does not support this MC293 iPod. Choose a compatible Classic package.",
     },
   },
   { id: "checks-passed", group: "Compatibility", label: "All checks passed", screen: "checks" },
@@ -122,7 +109,7 @@ export const scenarios: Scenario[] = [
     label: "Unsupported IPSW",
     screen: "firmware",
     hint: "Choose file to simulate validation failure.",
-    firmwareError: "Unsupported IPSW. Choose Apple firmware 2.0.1 or 2.0.4 for a supported iPod.",
+    firmwareError: "Choose iPod_38.2.0.5.ipsw (Apple 2.0.5).",
   },
   {
     id: "download-offline",

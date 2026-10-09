@@ -34,7 +34,6 @@ export interface CheckReport {
 
 export type CompatibilityIssue =
   | { kind: "unsupported_model"; model: string }
-  | { kind: "unsupported_firmware"; detected: string; required_versions: string[] }
   | { kind: "package_mismatch"; model: string };
 
 type CheckEvent =

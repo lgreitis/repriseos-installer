@@ -29,9 +29,7 @@ pub(super) fn backup(
     if syscfg.identity()? != *identity {
         return Err("NOR identity differs from the checked iPod.".into());
     }
-    save(&job.directory.join("nor.bin"), &nor.bytes)?;
-    save(&job.directory.join("syscfg.bin"), &nor.bytes[..syscfg.size])?;
-    job.save_json("nor.json", &nor.report)?;
+    job.save_nor(&nor, syscfg.size)?;
     job.emit("Boot firmware backup saved", None);
 
     Ok(nor.bytes)
@@ -48,7 +46,7 @@ pub(super) fn assemble(
     job.stage("decrypt", "Preparing Apple firmware")?;
     let cache = data.join("firmware");
     fs::create_dir_all(&cache)?;
-    let cache_file = cache.join(format!("osos-{}.bin", ipsw.metadata.target()?.target));
+    let cache_file = cache.join("osos-2.0.5.bin");
     let osos = match fs::read(&cache_file) {
         Ok(image) => {
             job.emit("Verifying cached Apple firmware", None);
@@ -69,15 +67,31 @@ pub(super) fn assemble(
         }
         Err(e) => return Err(e.into()),
     };
-    job.emit("Preparing Apple loader", None);
-    let loader = session.decrypt_nor(nor, |p| {
-        job.progress("Decrypting Apple loader", p.completed, p.total)
-    })?;
+    let cache_file = cache.join("aupd-2.0.5.bin");
+    let aupd = match fs::read(&cache_file) {
+        Ok(image) => {
+            ipsw.validate_aupd_plaintext(&image)?;
+            job.emit("Using verified decrypted Apple loader", None);
+            image
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let decrypted = session.decrypt(
+                ipsw.aupd_ciphertext(),
+                DecryptOptions::default(),
+                None,
+                |p| job.progress("Decrypting Apple loader", p.completed, p.total),
+            )?;
+            ipsw.validate_aupd_plaintext(&decrypted.plaintext)?;
+            save(&cache_file, &decrypted.plaintext)?;
+            decrypted.plaintext
+        }
+        Err(e) => return Err(e.into()),
+    };
     job.emit("Validating Apple firmware", None);
-    let prepared = PreparedInputs::from_plaintext(ipsw, nor, &osos, Some(&loader))?;
+    let prepared = PreparedInputs::from_plaintext(ipsw, &osos, &aupd)?;
     job.stage("assemble", "Preparing RepriseOS")?;
     let artifacts = assembly::assemble(bundle, &prepared.apple_inputs()?, nor)?;
-    artifacts.write(&job.directory.join("firmware"))?;
+    job.save_firmware(&artifacts)?;
 
     Ok(artifacts)
 }

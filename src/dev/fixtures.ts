@@ -12,8 +12,8 @@ export const mockDevice: DeviceInfo = {
 };
 
 export const mockFirmware: FirmwareInfo = {
-  filename: "iPod_35.2.0.4.ipsw",
-  version: "2.0.4",
+  filename: "iPod_38.2.0.5.ipsw",
+  version: "2.0.5",
   sha256: "mock-firmware-sha256",
 };
 

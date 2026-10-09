@@ -27,7 +27,7 @@ test("reports the selected filename before validation finishes", async () => {
   channel.onmessage("firmware.ipsw");
   assert.equal(filename, "firmware.ipsw");
   assert.equal(validated, false);
-  const firmware = { filename, version: "2.0.4", sha256: "firmware-hash" };
+  const firmware = { filename, version: "2.0.5", sha256: "firmware-hash" };
   finish(firmware);
   assert.deepEqual(await pending, firmware);
 });
@@ -47,4 +47,27 @@ test("cancelled selection emits no filename and invalid firmware rejects validat
     (error) => error === "Unsupported IPSW",
   );
   assert.deepEqual(selections, ["incompatible.ipsw"]);
+});
+
+test("late filename notifications cannot restart validation after failure or success", async () => {
+  let channel;
+  const selections = [];
+  mockIPC((_, args) => {
+    channel = args.onSelected;
+    return Promise.reject("Choose iPod_38.2.0.5.ipsw (Apple 2.0.5).");
+  });
+  await assert.rejects(chooseFirmware((name) => selections.push(name)));
+  const failedChannel = channel;
+  failedChannel.onmessage("incompatible.ipsw");
+  assert.deepEqual(selections, []);
+
+  const firmware = { filename: "iPod_38.2.0.5.ipsw", version: "2.0.5", sha256: "hash" };
+  mockIPC((_, args) => {
+    channel = args.onSelected;
+    return firmware;
+  });
+  assert.deepEqual(await chooseFirmware((name) => selections.push(name)), firmware);
+  channel.onmessage(firmware.filename);
+  failedChannel.onmessage("incompatible.ipsw");
+  assert.deepEqual(selections, []);
 });

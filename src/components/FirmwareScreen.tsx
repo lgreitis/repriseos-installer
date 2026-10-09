@@ -86,7 +86,7 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
       </ScreenReveal>
       <ScreenReveal delay={0.08}>
         <InstallerScreen.Description>
-          Select a compatible IPSW firmware file.
+          Select iPod_38.2.0.5.ipsw for any supported iPod Classic.
         </InstallerScreen.Description>
         <div className="installer-well mx-auto mt-7 flex max-w-125 flex-wrap items-center justify-between gap-4 rounded-lg p-4 text-left">
           <div className="min-w-0 flex-1 text-[13px] text-body" role="status">
@@ -116,9 +116,14 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
                   setFirmwareAction("validate");
                   appendSessionLog(`Validating firmware: ${name}.`);
                 });
-                if (selected) onSelect(selected);
+                if (selected) {
+                  setFilename(selected.filename);
+                  setError("");
+                  onSelect(selected);
+                }
               } catch (error) {
                 const detail = errorDetail(error);
+                onSelect(null);
                 setError(detail);
                 appendSessionLog(`Firmware validation failed: ${detail}`);
               } finally {

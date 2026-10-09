@@ -1,4 +1,6 @@
 use super::{InstallState, Result};
+use reprise_bundle::assembly::Artifacts;
+use reprise_device::NorDump;
 use serde::Serialize;
 use std::{
     fs::{self, File, OpenOptions},
@@ -24,6 +26,7 @@ pub struct InstallResult {
 
 pub(super) struct Job<'a> {
     pub(super) directory: PathBuf,
+    device_directory: PathBuf,
     state: &'a InstallState,
     channel: Channel<InstallEvent>,
     journal: File,
@@ -38,12 +41,17 @@ impl<'a> Job<'a> {
         channel: Channel<InstallEvent>,
         directory: PathBuf,
     ) -> Result<Self> {
+        let device_directory = directory
+            .parent()
+            .ok_or("Missing device backup directory")?
+            .to_owned();
         let journal = OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(directory.join("events.jsonl"))?;
         Ok(Self {
             directory,
+            device_directory,
             state,
             channel,
             journal,
@@ -107,6 +115,33 @@ impl<'a> Job<'a> {
 
     pub(super) fn save_json(&self, name: &str, value: &impl Serialize) -> Result<()> {
         save_json(&self.directory.join(name), value)
+    }
+
+    pub(super) fn save_nor(&self, nor: &NorDump, syscfg_size: usize) -> Result<()> {
+        let snapshot = self.device_directory.join("nor").join(&nor.report.sha256);
+        fs::create_dir_all(&snapshot)?;
+        save_or_verify(&snapshot.join("nor.bin"), &nor.bytes)?;
+        save_or_verify(&snapshot.join("syscfg.bin"), &nor.bytes[..syscfg_size])?;
+        self.save_json(
+            "nor.json",
+            &serde_json::json!({
+                "backup": format!("../nor/{}/nor.bin", nor.report.sha256),
+                "report": nor.report,
+            }),
+        )
+    }
+
+    pub(super) fn save_firmware(&self, artifacts: &Artifacts) -> Result<()> {
+        let staged = self.directory.join("firmware");
+        let report = artifacts.write(&staged)?;
+        let latest = self.device_directory.join("firmware");
+        match fs::remove_dir_all(&latest) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        fs::rename(staged, latest)?;
+        self.save_json("assembly.json", &report)
     }
 
     pub(super) fn begin_bootloader(&mut self) -> Result<()> {
@@ -175,6 +210,19 @@ pub(super) fn save(path: &Path, bytes: &[u8]) -> Result<()> {
         return Err("Saved file readback differs from its source.".into());
     }
     Ok(())
+}
+
+fn save_or_verify(path: &Path, bytes: &[u8]) -> Result<()> {
+    match fs::read(path) {
+        Ok(saved) if saved == bytes => Ok(()),
+        Ok(_) => Err(format!(
+            "Existing backup does not match the verified device data: {}",
+            path.display()
+        )
+        .into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => save(path, bytes),
+        Err(error) => Err(error.into()),
+    }
 }
 
 pub(super) fn save_json(path: &Path, value: &impl Serialize) -> Result<()> {

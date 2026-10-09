@@ -16,7 +16,7 @@ function capture(backend) {
 
 test("scenario selection is deterministic and unknown commands never reach native IPC", async () => {
   assert.equal(new Set(scenarios.map((scenario) => scenario.id)).size, scenarios.length);
-  assert.equal(findScenario(null).id, "firmware-required");
+  assert.equal(findScenario(null).id, "unsupported-model");
   const backend = createMockBackend(findScenario(null), immediate);
   await assert.rejects(backend.invoke("unexpected_device_command"), /Unimplemented simulated/);
   assert.throws(() => installDevelopmentBackend(backend), /development build/);

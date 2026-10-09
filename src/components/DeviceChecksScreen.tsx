@@ -17,7 +17,6 @@ import { InstallerScreen } from "./ui/InstallerScreen";
 interface IDeviceChecksScreenProps {
   onContinue: () => void;
   onBack: () => void;
-  onStart: () => void;
   onChangeFirmware: () => void;
 }
 
@@ -48,7 +47,6 @@ function groupStatus(checks: Check[]): CheckStatus {
 const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
   onContinue,
   onBack,
-  onStart,
   onChangeFirmware,
 }) => {
   const { checks, running, report, error, progress, device, reconnecting, replacement } =
@@ -158,10 +156,6 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
         {failure?.action === "another-ipod" ? (
           <Button.Root onClick={onBack}>
             <Button.Label>Check another iPod</Button.Label>
-          </Button.Root>
-        ) : failure?.action === "start" ? (
-          <Button.Root onClick={onStart}>
-            <Button.Label>Back to start</Button.Label>
           </Button.Root>
         ) : failure?.action === "firmware" ? (
           <Button.Root onClick={onChangeFirmware}>

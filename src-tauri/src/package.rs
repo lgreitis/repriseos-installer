@@ -4,7 +4,7 @@ mod tests;
 
 use crate::firmware::FirmwareState;
 use reprise_bundle::{TrustedKey, VerifiedBundle};
-use reprise_device::targets::Target;
+use reprise_device::firmware::Firmware;
 use serde::Serialize;
 
 use std::sync::{Arc, Mutex};
@@ -126,14 +126,12 @@ pub async fn prepare_package(
 
 pub(crate) fn require_target(
     compatibility: &reprise_bundle::Compatibility,
-    target: &Target,
+    target: &Firmware,
 ) -> Result<(), String> {
     if compatibility.target != target.target {
         return Err(format!(
-            "This package is for {}. Choose a package for Apple {} ({}).",
-            compatibility.target,
-            target.ipsw.version,
-            target.compatibility.models.join(" / ")
+            "This package is for {}. Choose the Classic package for Apple {}.",
+            compatibility.target, target.ipsw.version
         ));
     }
     Ok(())
@@ -147,14 +145,11 @@ pub(crate) fn require_device(
         .identity
         .as_ref()
         .ok_or("Missing checked device identity.")?;
-    if !compatibility.matches_identity(
-        &identity.model,
-        identity.hardware_version,
-        &identity.recorded_firmware,
-    ) || report.bootrom_sha256.as_deref() != Some(&compatibility.bootrom_sha256)
+    if !compatibility.matches_hardware(identity.hardware_version)
+        || report.bootrom_sha256.as_deref() != Some(&compatibility.bootrom_sha256)
     {
         return Err(format!(
-            "The selected firmware package does not support this {} iPod. Choose the IPSW and package for this model.",
+            "The selected firmware package does not support this {} iPod. Choose a compatible Classic package.",
             identity.model
         ));
     }

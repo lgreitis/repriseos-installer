@@ -11,7 +11,7 @@ import {
 
 globalThis.window = { crypto: globalThis.crypto };
 globalThis.isTauri = true;
-const firmware = { filename: "firmware.ipsw", version: "2.0.4", sha256: "firmware-hash" };
+const firmware = { filename: "firmware.ipsw", version: "2.0.5", sha256: "firmware-hash" };
 
 test("starts once, forwards selected hashes, and waits for backend completion", async () => {
   let finish;

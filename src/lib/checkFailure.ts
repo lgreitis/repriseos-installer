@@ -3,7 +3,7 @@ import type { CheckReport } from "./deviceChecks.ts";
 export interface CheckFailure {
   title: string;
   message: string;
-  action: "another-ipod" | "start" | "firmware" | "retry";
+  action: "another-ipod" | "firmware" | "retry";
 }
 
 export function describeCheckFailure(
@@ -19,16 +19,10 @@ export function describeCheckFailure(
         message: `RepriseOS doesn’t currently support your iPod (${issue.model}).`,
         action: "another-ipod",
       };
-    case "unsupported_firmware":
-      return {
-        title: "Unsupported Apple firmware.",
-        message: `Your iPod is on Apple firmware ${issue.detected}; upgrade to ${issue.required_versions.join(" or ")} to install RepriseOS.`,
-        action: "start",
-      };
     case "package_mismatch":
       return {
         title: "Firmware package doesn’t match.",
-        message: `Choose the IPSW and RepriseOS package for your ${issue.model} iPod.`,
+        message: `Choose a compatible Classic package for your ${issue.model} iPod.`,
         action: "firmware",
       };
     default:

@@ -3,27 +3,31 @@
 Desktop app for installing RepriseOS, an enhanced version of Apple's original
 iPod firmware. Validates firmware, backs up NOR/SysCfg, applies patches, uploads
 RepriseOS, and installs the bootloader.
-Backups and installation logs stay in the application's data directory.
+The installer uses Apple **2.0.5** for all supported iPod Classics.
 
-Current support (FAT32 storage required):
+## Compatibility
 
-- iPod Classic 6.5G / Rev A: MB562 and MB565, Apple firmware 2.0.1.
-- iPod Classic 7G / Rev B: MC293 and MC297, Apple firmware 2.0.4.
+- iPod Classic 6G, 6.5G and 7G.
+- FAT32 storage required.
 
-## Run
+## Install
+
+Download RepriseOS Installer from [the website](https://repriseos.com/download/)
+or [GitHub releases](https://github.com/lgreitis/repriseos-installer/releases).
+Select **`iPod_38.2.0.5.ipsw`**, even if the iPod runs an older Apple firmware.
+Follow the DFU instructions in the app. The installer downloads and verifies the
+latest RepriseOS package.
+
+## Development
 
 Built with Tauri and React. Requires Node.js, pnpm, Rust, the Tauri platform
 prerequisites, libusb, and pkg-config. Cargo fetches the shared Rust crates from
-[osos-lab](https://github.com/lgreitis/osos-lab), using the revision in `Cargo.lock`.
+[osos-lab](https://github.com/lgreitis/osos-lab), pinned in `Cargo.toml` and `Cargo.lock`.
 
 ```sh
 pnpm install
 pnpm tauri dev
 ```
-
-Choose a compatible IPSW and use **Alternatively, choose a local package…** for
-a bundle ZIP. Automatic downloads require `REPRISE_BUNDLE_MANIFEST_URL` and
-`REPRISE_BUNDLE_PUBLIC_KEY` (hex Ed25519 public key) at build time.
 
 ## Build and check
 

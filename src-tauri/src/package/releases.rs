@@ -28,7 +28,7 @@ fn newest_manifest(releases: Vec<Release>, target: &str) -> Result<String, Strin
         .into_iter()
         .find(|asset| asset.name == name)
         .map(|asset| asset.browser_download_url)
-        .ok_or_else(|| format!("The newest RepriseOS release has no package for {target}. Choose a matching local package."))
+        .ok_or_else(|| "The latest RepriseOS release doesn’t include a compatible firmware package. Choose a local package to continue.".into())
 }
 
 pub(super) fn latest_manifest_url(target: &str) -> Result<String, String> {
@@ -69,8 +69,8 @@ mod tests {
                 "prerelease": prerelease,
                 "published_at": date,
                 "assets": [{
-                    "name": "classic7g-2.0.4-manifest.json",
-                    "browser_download_url": format!("https://github.com/lgreitis/osos-lab/releases/download/{tag}/classic7g-2.0.4-manifest.json")
+                    "name": "classic-manifest.json",
+                    "browser_download_url": format!("https://github.com/lgreitis/osos-lab/releases/download/{tag}/classic-manifest.json")
                 }]
             })
         };
@@ -81,13 +81,13 @@ mod tests {
         ]))
         .unwrap();
         assert_eq!(
-            newest_manifest(releases, "classic7g-2.0.4").unwrap(),
-            "https://github.com/lgreitis/osos-lab/releases/download/v0.2.0-alpha.1/classic7g-2.0.4-manifest.json"
+            newest_manifest(releases, "classic").unwrap(),
+            "https://github.com/lgreitis/osos-lab/releases/download/v0.2.0-alpha.1/classic-manifest.json"
         );
-        assert!(newest_manifest(Vec::new(), "classic7g-2.0.4").is_err());
+        assert!(newest_manifest(Vec::new(), "classic").is_err());
     }
     #[test]
-    fn selects_each_target_without_falling_back_to_another_package_or_release() {
+    fn does_not_fall_back_to_old_firmware_packages_or_releases() {
         let release = |date, names: &[&str]| {
             json!({
                 "draft": false, "published_at": date,
@@ -96,28 +96,14 @@ mod tests {
                 })).collect::<Vec<_>>()
             })
         };
-        let both = release(
-            "2026-10-05",
-            &[
-                "classic6g-reva-2.0.1-manifest.json",
-                "classic7g-2.0.4-manifest.json",
-            ],
-        );
-        for target in reprise_device::targets::all() {
-            let releases = serde_json::from_value(json!([both])).unwrap();
-            assert_eq!(
-                newest_manifest(releases, &target.target).unwrap(),
-                format!("https://example.com/{}-manifest.json", target.target)
-            );
-        }
         let releases = serde_json::from_value(json!([
-            both,
+            release("2026-10-05", &["classic-manifest.json"]),
             release(
                 "2026-10-06",
                 &["classic7g-2.0.4-manifest.json", "manifest.json"]
             )
         ]))
         .unwrap();
-        assert!(newest_manifest(releases, "classic6g-reva-2.0.1").is_err());
+        assert!(newest_manifest(releases, "classic").is_err());
     }
 }

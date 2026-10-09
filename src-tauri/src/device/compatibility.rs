@@ -1,19 +1,11 @@
-use reprise_device::{targets, CheckId, CheckReport, CheckStatus, Cleanup};
+use reprise_device::{CheckId, CheckReport, CheckStatus, Cleanup};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CompatibilityIssue {
-    UnsupportedModel {
-        model: String,
-    },
-    UnsupportedFirmware {
-        detected: String,
-        required_versions: Vec<String>,
-    },
-    PackageMismatch {
-        model: String,
-    },
+    UnsupportedModel { model: String },
+    PackageMismatch { model: String },
 }
 
 pub fn issue_for_report(report: &CheckReport) -> Option<CompatibilityIssue> {
@@ -29,31 +21,9 @@ pub fn issue_for_report(report: &CheckReport) -> Option<CompatibilityIssue> {
         CheckId::Model => Some(CompatibilityIssue::UnsupportedModel {
             model: identity.model.clone(),
         }),
-        CheckId::Version => {
-            if targets::for_identity(
-                &identity.model,
-                identity.hardware_version,
-                &identity.recorded_firmware,
-            )
-            .is_some()
-            {
-                return Some(CompatibilityIssue::PackageMismatch {
-                    model: identity.model.clone(),
-                });
-            }
-            let required_versions: Vec<_> = targets::all()
-                .iter()
-                .filter(|target| {
-                    target.compatibility.models.contains(&identity.model)
-                        && target.compatibility.hardware_version == identity.hardware_version
-                })
-                .map(|target| target.ipsw.version.clone())
-                .collect();
-            (!required_versions.is_empty()).then(|| CompatibilityIssue::UnsupportedFirmware {
-                detected: identity.recorded_firmware.clone(),
-                required_versions,
-            })
-        }
+        CheckId::Version => Some(CompatibilityIssue::PackageMismatch {
+            model: identity.model.clone(),
+        }),
         _ => None,
     }
 }
@@ -90,25 +60,11 @@ mod tests {
     fn compatibility_reasons_use_identity_and_manifest_not_diagnostic_text() {
         for (model, hardware, firmware, failed, expected) in [
             (
-                "MB029",
-                0x00130000,
+                "MA002",
+                0x000b0000,
                 "1.1.2",
                 CheckId::Model,
-                serde_json::json!({"kind": "unsupported_model", "model": "MB029"}),
-            ),
-            (
-                "MC293",
-                0x00130200,
-                "2.0.2",
-                CheckId::Version,
-                serde_json::json!({"kind": "unsupported_firmware", "detected": "2.0.2", "required_versions": ["2.0.4"]}),
-            ),
-            (
-                "MB565",
-                0x00130100,
-                "2.0.4",
-                CheckId::Version,
-                serde_json::json!({"kind": "unsupported_firmware", "detected": "2.0.4", "required_versions": ["2.0.1"]}),
+                serde_json::json!({"kind": "unsupported_model", "model": "MA002"}),
             ),
             (
                 "MC293",
@@ -135,7 +91,7 @@ mod tests {
 
     #[test]
     fn cleanup_and_incomplete_identity_keep_their_original_errors() {
-        let mut checked = report("MB029", 0x00130000, "1.1.2", CheckId::Model);
+        let mut checked = report("MA002", 0x000b0000, "1.1.2", CheckId::Model);
         checked.cleanup = Cleanup::Failed("Disconnected".into());
         assert!(issue_for_report(&checked).is_none());
         checked.cleanup = Cleanup::Idle;

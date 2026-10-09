@@ -8,13 +8,18 @@ export interface FirmwareInfo {
   sha256: string;
 }
 
-export function chooseFirmware(
+export async function chooseFirmware(
   onSelected: (filename: string) => void,
 ): Promise<FirmwareInfo | null> {
   if (!backendAvailable()) return Promise.reject("Open the desktop installer to select firmware.");
   const channel = createChannel<string>();
   channel.onmessage = onSelected;
-  return invoke("choose_firmware", { onSelected: channel });
+  try {
+    return await invoke<FirmwareInfo | null>("choose_firmware", { onSelected: channel });
+  } finally {
+    // Channel notifications can arrive after the command result.
+    channel.onmessage = () => {};
+  }
 }
 
 export interface InstallEvent {

@@ -118,7 +118,6 @@ const App: React.FC<AppProps> = ({ initial }) => {
               <DeviceChecksScreen
                 onContinue={beginInstall}
                 onBack={() => setScreen("dfu")}
-                onStart={() => setScreen("main")}
                 onChangeFirmware={() => {
                   setPackageDigest("");
                   setScreen("firmware");
