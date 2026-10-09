@@ -9,6 +9,7 @@ import { InstallerUpdates } from "./components/InstallerUpdates";
 import { MainScreen } from "./components/MainScreen";
 import { SuccessScreen } from "./components/SuccessScreen";
 import { DebugLog } from "./components/ui/DebugLog";
+import { backendAvailable, openExternalUrl } from "./lib/backend";
 import { startDeviceChecks } from "./lib/deviceChecks";
 import { type FirmwareInfo, startInstallation } from "./lib/installation";
 import type { PackageInfo } from "./lib/package";
@@ -134,11 +135,29 @@ const App: React.FC<AppProps> = ({ initial }) => {
           </motion.div>
         </AnimatePresence>
       </div>
+      <a
+        href="https://ko-fi.com/lgreitis"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute bottom-4 left-4 rounded text-xs text-muted underline-offset-4 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus"
+        onClick={(event) => {
+          if (!backendAvailable()) return;
+          event.preventDefault();
+          void openExternalUrl(event.currentTarget.href).catch((error: unknown) => {
+            appendSessionLog(`Could not open Ko-fi: ${String(error)}`);
+          });
+        }}
+      >
+        <span aria-hidden="true" className="text-red-500">
+          ♥
+        </span>{" "}
+        Support on Ko-fi
+      </a>
       <DebugLog entries={logs} />
       {import.meta.env.DEV && !initial && screen === "main" && !updateIsBusy(updater.status) && (
         <a
           href="?dev-panel"
-          className="fixed bottom-3 left-3 rounded border border-black/20 bg-white px-3 py-2 text-xs text-black"
+          className="fixed right-3 bottom-3 rounded border border-black/20 bg-white px-3 py-2 text-xs text-black"
         >
           Dev panel
         </a>

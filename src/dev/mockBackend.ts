@@ -60,6 +60,7 @@ export function createMockBackend(
         };
       case "install_installer_update":
         return simulateUpdate(scenario, channel(args), wait);
+      case "plugin:opener|open_url":
       case "open_installer_download":
         return;
       default:

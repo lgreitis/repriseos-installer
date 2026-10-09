@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 use tauri::{ipc::Channel, AppHandle, Manager};
+use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 const FEED: &str =
@@ -179,31 +180,8 @@ pub async fn install_installer_update(
 }
 
 #[tauri::command]
-pub async fn open_installer_download() -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        #[cfg(target_os = "macos")]
-        let mut command = std::process::Command::new("open");
-        #[cfg(target_os = "windows")]
-        let mut command = {
-            use std::os::windows::process::CommandExt;
-            let mut command = std::process::Command::new("rundll32.exe");
-            command
-                .arg("url.dll,FileProtocolHandler")
-                .creation_flags(0x08000000);
-            command
-        };
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-        let mut command = std::process::Command::new("xdg-open");
-        let status = command
-            .arg(DOWNLOAD_PAGE)
-            .status()
-            .map_err(|e| e.to_string())?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err("Could not open the download page.".into())
-        }
-    })
-    .await
-    .map_err(|e| e.to_string())?
+pub async fn open_installer_download(app: AppHandle) -> Result<(), String> {
+    app.opener()
+        .open_url(DOWNLOAD_PAGE, None::<&str>)
+        .map_err(|e| e.to_string())
 }

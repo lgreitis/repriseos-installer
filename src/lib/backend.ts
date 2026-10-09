@@ -1,4 +1,5 @@
 import { Channel, isTauri, invoke as nativeInvoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 export interface EventChannel<T> {
   onmessage: (message: T) => void;
@@ -30,4 +31,10 @@ export function invoke<T>(command: string, args?: Record<string, unknown>): Prom
   return developmentBackend
     ? developmentBackend.invoke<T>(command, args)
     : nativeInvoke<T>(command, args);
+}
+
+export function openExternalUrl(url: string): Promise<void> {
+  return developmentBackend
+    ? developmentBackend.invoke("plugin:opener|open_url", { url })
+    : openUrl(url);
 }
