@@ -1,5 +1,5 @@
 import { backendAvailable, createChannel, invoke } from "./backend.ts";
-import { errorDetail } from "./deviceChecks.ts";
+import { errorDetail } from "./errors.ts";
 
 export interface UpdateInfo {
   current_version: string;

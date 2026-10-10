@@ -32,6 +32,10 @@ jobs:
             target: x86_64-pc-windows-msvc
             rust-targets: x86_64-pc-windows-msvc
             bundles: nsis
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            rust-targets: x86_64-unknown-linux-gnu
+            bundles: deb,rpm,appimage
     defaults:
       run:
         shell: bash
@@ -87,6 +91,13 @@ jobs:
           version: '11.22.0'
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
+      - name: Check frontend
+        run: pnpm check
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libudev-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf libfuse2 rpm
       - name: Install Rust
         run: |
           rustup toolchain install 1.96.0 --profile minimal
@@ -96,6 +107,9 @@ jobs:
         with:
           workspaces: src-tauri -> target
           key: ${{ matrix.target }}
+      - name: Test Linux backend
+        if: runner.os == 'Linux'
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --target ${{ matrix.target }}
       - name: Build installers
         uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         env:
@@ -114,6 +128,10 @@ jobs:
           updaterJsonPreferNsis: true
           uploadPlainBinary: ${{ runner.os == 'Windows' }}
           uploadWorkflowArtifacts: true
+      - name: Verify Linux package contents
+        if: runner.os == 'Linux'
+        run: |
+          python3 scripts/verify-linux-packages.py src-tauri/target/${{ matrix.target }}/release/bundle
       - name: Remove notarization key
         if: always() && runner.os == 'macOS'
         run: rm -f "$RUNNER_TEMP/repriseos-notary-key.p8"
@@ -145,6 +163,10 @@ jobs:
               "repriseos-installer_windows_x64-setup.exe",
               "repriseos-installer_windows_x64-setup.exe.sig",
               "repriseos-installer_windows_x64.exe",
+              "repriseos-installer_linux_x64.deb",
+              "repriseos-installer_linux_x64.rpm",
+              "repriseos-installer_linux_x64.AppImage",
+              "repriseos-installer_linux_x64.AppImage.sig",
           }
           assert required <= assets, f"Missing release assets: {required - assets}"
           feed = json.load(open("latest.json"))

@@ -3,6 +3,7 @@ mod firmware;
 mod install;
 mod package;
 mod updates;
+mod usb_permissions;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -32,6 +33,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            usb_permissions::usb_permissions_ready,
+            usb_permissions::enable_usb_access,
             device::discover_devices,
             device::check_device,
             package::choose_local_package,

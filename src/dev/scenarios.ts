@@ -8,6 +8,7 @@ export interface Scenario {
   screen: Screen;
   hint?: string;
   discovery?: "absent" | "multiple" | "normal" | "denied";
+  usbSetup?: "required" | "denied" | "unavailable" | "waiting" | "checking" | "check-error";
   checkFailure?: { id: CheckId; detail: string; model?: string; version?: string };
   issue?: CompatibilityIssue;
   cleanupFailure?: string;
@@ -20,7 +21,14 @@ export interface Scenario {
 }
 
 export const scenarios: Scenario[] = [
-  { id: "full-setup", group: "Setup", label: "Successful setup", screen: "main" },
+  {
+    id: "full-setup",
+    group: "Setup",
+    label: "Successful setup",
+    screen: "main",
+    usbSetup: "required",
+    hint: "Includes one-time Linux USB setup before DFU. All device operations and authentication are simulated.",
+  },
   {
     id: "unsupported-model",
     group: "Compatibility",
@@ -47,6 +55,61 @@ export const scenarios: Scenario[] = [
   },
   { id: "checks-passed", group: "Compatibility", label: "All checks passed", screen: "checks" },
   { id: "no-device", group: "Connection", label: "No iPod", screen: "dfu", discovery: "absent" },
+  {
+    id: "usb-setup",
+    group: "Linux USB setup",
+    label: "Enable helper access",
+    screen: "permissions",
+    usbSetup: "required",
+    hint: "Enable iPod access simulates successful setup without requesting administrator privileges.",
+  },
+  {
+    id: "usb-setup-denied",
+    group: "Linux USB setup",
+    label: "Authentication cancelled",
+    screen: "permissions",
+    usbSetup: "denied",
+    hint: "The first attempt is cancelled. Retry to simulate successful authentication.",
+  },
+  {
+    id: "usb-setup-unavailable",
+    group: "Linux USB setup",
+    label: "Authentication unavailable",
+    screen: "permissions",
+    usbSetup: "unavailable",
+    hint: "Enable iPod access fails because administrator authentication is unavailable.",
+  },
+  {
+    id: "usb-setup-waiting",
+    group: "Linux USB setup",
+    label: "Waiting for authentication",
+    screen: "permissions",
+    usbSetup: "waiting",
+    hint: "Enable iPod access stays pending so you can inspect the disabled buttons. Replay to reset.",
+  },
+  {
+    id: "usb-setup-checking",
+    group: "Linux USB setup",
+    label: "Checking access",
+    screen: "permissions",
+    usbSetup: "checking",
+    hint: "The initial access check stays pending. Replay to reset.",
+  },
+  {
+    id: "usb-setup-check-error",
+    group: "Linux USB setup",
+    label: "Access check failed",
+    screen: "permissions",
+    usbSetup: "check-error",
+    hint: "The initial check fails. Enable iPod access still allows setup to recover.",
+  },
+  {
+    id: "usb-setup-ready",
+    group: "Linux USB setup",
+    label: "Access already enabled",
+    screen: "permissions",
+    hint: "Automatically advances to DFU, as on an already configured system or another OS.",
+  },
   {
     id: "multiple-devices",
     group: "Connection",

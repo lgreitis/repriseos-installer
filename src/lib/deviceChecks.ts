@@ -1,4 +1,5 @@
 import { backendAvailable, createChannel, invoke } from "./backend.ts";
+import { errorDetail } from "./errors.ts";
 import { appendSessionLog } from "./sessionLog.ts";
 
 export interface DeviceSelector {
@@ -76,14 +77,6 @@ export function subscribeToChecks(listener: () => void) {
   return () => {
     listeners.delete(listener);
   };
-}
-
-export function errorDetail(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "object" && error !== null && "detail" in error) {
-    return String(error.detail);
-  }
-  return String(error);
 }
 
 let discovery: Promise<DeviceInfo[]> | null = null;
@@ -165,18 +158,19 @@ export function startDeviceChecks(device: DeviceInfo) {
     })
     .catch((error: unknown) => {
       if (state.jobId !== jobId) return;
-      appendSessionLog(`Device checks failed: ${errorDetail(error)}`);
+      const detail = errorDetail(error);
+      appendSessionLog(`Device checks failed: ${detail}`);
       const stage =
         typeof error === "object" && error !== null && "stage" in error ? error.stage : "usb";
       const failedId = checkIds.find((id) => id === stage) ?? "usb";
       publish({
         ...state,
         running: false,
-        error: errorDetail(error),
+        error: detail,
         checks: state.checks.map((check) => ({
           ...check,
           status: check.id === failedId ? "failed" : "skipped",
-          detail: check.id === failedId ? errorDetail(error) : "A preceding check failed",
+          detail: check.id === failedId ? detail : "A preceding check failed",
         })),
       });
     });
@@ -203,7 +197,8 @@ export async function retryDeviceChecks() {
     if (sameLocation) startDeviceChecks(device);
     else appendSessionLog("Reconnected iPod requires confirmation before checking.");
   } catch (error) {
-    appendSessionLog(`Reconnection failed: ${errorDetail(error)}`);
-    publish({ ...state, reconnecting: false, error: errorDetail(error) });
+    const detail = errorDetail(error);
+    appendSessionLog(`Reconnection failed: ${detail}`);
+    publish({ ...state, reconnecting: false, error: detail });
   }
 }

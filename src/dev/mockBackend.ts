@@ -15,9 +15,31 @@ export function createMockBackend(
   wait: Wait = () => new Promise((resolve) => setTimeout(resolve, 250)),
 ): Backend {
   let cancelled = false;
+  let usbReady = !scenario.usbSetup;
+  let usbAttempts = 0;
 
   async function handle(command: string, args: Record<string, unknown>) {
     switch (command) {
+      case "usb_permissions_ready":
+        if (scenario.usbSetup === "checking") return new Promise<never>(() => {});
+        if (scenario.usbSetup === "check-error" && !usbReady)
+          throw new Error("Could not check USB access setup.");
+        return usbReady;
+      case "enable_usb_access":
+        usbAttempts += 1;
+        if (scenario.usbSetup === "waiting") return new Promise<never>(() => {});
+        await wait();
+        if (scenario.usbSetup === "unavailable") {
+          throw new Error(
+            "Administrator authentication is unavailable or was denied. Make sure polkit and a desktop authentication agent are installed and running, then try again.",
+          );
+        }
+        if (scenario.usbSetup === "denied" && usbAttempts === 1)
+          throw new Error(
+            "Administrator authentication was cancelled. Try again to enable iPod access.",
+          );
+        usbReady = true;
+        return;
       case "discover_devices":
         if (scenario.discovery === "denied")
           throw new Error("USB discovery failed: access denied.");

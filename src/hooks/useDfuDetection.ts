@@ -1,5 +1,6 @@
 import React from "react";
-import { type DeviceInfo, discoverDevices, errorDetail } from "../lib/deviceChecks";
+import { type DeviceInfo, discoverDevices } from "../lib/deviceChecks";
+import { errorDetail } from "../lib/errors";
 import { appendSessionLog } from "../lib/sessionLog";
 
 export function useDfuDetection(enabled: boolean) {

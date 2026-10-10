@@ -7,6 +7,51 @@ import { installDevelopmentBackend } from "../src/lib/backend.ts";
 
 const immediate = async () => undefined;
 
+test("USB setup scenarios gate continuation and never request real authentication", async () => {
+  const ready = createMockBackend(findScenario("usb-setup-ready"), immediate);
+  assert.equal(await ready.invoke("usb_permissions_ready"), true);
+  for (const id of ["full-setup", "usb-setup"]) {
+    const setup = createMockBackend(findScenario(id), immediate);
+    assert.equal(await setup.invoke("usb_permissions_ready"), false, id);
+    await setup.invoke("enable_usb_access");
+    assert.equal(await setup.invoke("usb_permissions_ready"), true, id);
+  }
+  const denied = createMockBackend(findScenario("usb-setup-denied"), immediate);
+  await assert.rejects(denied.invoke("enable_usb_access"), /cancelled/);
+  assert.equal(await denied.invoke("usb_permissions_ready"), false);
+  await denied.invoke("enable_usb_access");
+  assert.equal(await denied.invoke("usb_permissions_ready"), true);
+});
+
+test("USB setup covers unavailable authentication and recovery after a failed check", async () => {
+  const unavailable = createMockBackend(findScenario("usb-setup-unavailable"), immediate);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await assert.rejects(unavailable.invoke("enable_usb_access"), /authentication is unavailable/);
+    assert.equal(await unavailable.invoke("usb_permissions_ready"), false);
+  }
+  const failedCheck = createMockBackend(findScenario("usb-setup-check-error"), immediate);
+  await assert.rejects(failedCheck.invoke("usb_permissions_ready"), /Could not check/);
+  await failedCheck.invoke("enable_usb_access");
+  assert.equal(await failedCheck.invoke("usb_permissions_ready"), true);
+});
+
+test("USB setup previews can stay pending without granting access", async () => {
+  for (const [id, command] of [
+    ["usb-setup-checking", "usb_permissions_ready"],
+    ["usb-setup-waiting", "enable_usb_access"],
+  ]) {
+    const backend = createMockBackend(findScenario(id), immediate);
+    let settled = false;
+    void backend.invoke(command).finally(() => {
+      settled = true;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(settled, false, id);
+    if (command === "enable_usb_access")
+      assert.equal(await backend.invoke("usb_permissions_ready"), false);
+  }
+});
+
 function capture(backend) {
   const events = [];
   const channel = backend.createChannel();

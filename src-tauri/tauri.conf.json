@@ -26,6 +26,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "Utility",
+    "shortDescription": "Install RepriseOS on your iPod Classic",
+    "longDescription": "Validate Apple firmware, back up boot firmware, and install RepriseOS on supported iPod Classic devices.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -39,6 +42,23 @@
       }
     },
     "createUpdaterArtifacts": true,
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/lib/udev/rules.d/70-repriseos.rules": "linux/70-repriseos.rules"
+        },
+        "postInstallScript": "linux/reload-udev.sh",
+        "postRemoveScript": "linux/reload-udev.sh"
+      },
+      "rpm": {
+        "depends": ["webkit2gtk4.1", "gtk3"],
+        "files": {
+          "/usr/lib/udev/rules.d/70-repriseos.rules": "linux/70-repriseos.rules"
+        },
+        "postInstallScript": "linux/reload-udev.sh",
+        "postRemoveScript": "linux/reload-udev.sh"
+      }
+    },
     "windows": {
       "nsis": {
         "installerHooks": "./windows/hooks.nsh"

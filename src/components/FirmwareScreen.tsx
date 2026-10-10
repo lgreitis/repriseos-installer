@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import React from "react";
 import { useHeadingFocus } from "../hooks/useHeadingFocus";
-import { errorDetail } from "../lib/deviceChecks";
+import { errorDetail } from "../lib/errors";
 import { chooseFirmware, type FirmwareInfo } from "../lib/installation";
 import { chooseLocalPackage, type PackageInfo, preparePackage } from "../lib/package";
 import { appendSessionLog } from "../lib/sessionLog";

@@ -25,8 +25,10 @@ fn installed_nsis_directory(directory: &Path) -> Option<std::path::PathBuf> {
         return None;
     }
     let words: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
         .collect();
     let path = String::from_utf16(&words).ok()?;
     Path::new(path.trim_start_matches('\u{feff}'))

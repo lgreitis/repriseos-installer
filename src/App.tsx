@@ -8,6 +8,7 @@ import { InstallationScreen } from "./components/InstallationScreen";
 import { InstallerUpdates } from "./components/InstallerUpdates";
 import { MainScreen } from "./components/MainScreen";
 import { SuccessScreen } from "./components/SuccessScreen";
+import { UsbPermissionsScreen } from "./components/UsbPermissionsScreen";
 import { DebugLog } from "./components/ui/DebugLog";
 import { backendAvailable, openExternalUrl } from "./lib/backend";
 import { startDeviceChecks } from "./lib/deviceChecks";
@@ -21,6 +22,7 @@ export type Screen =
   | "main"
   | "disclaimer"
   | "firmware"
+  | "permissions"
   | "dfu"
   | "checks"
   | "installation"
@@ -103,10 +105,17 @@ const App: React.FC<AppProps> = ({ initial }) => {
                 }}
                 onContinue={(digest) => {
                   setPackageDigest(digest);
+                  setScreen("permissions");
+                }}
+                onBack={() => setScreen("disclaimer")}
+              />
+            ) : screen === "permissions" ? (
+              <UsbPermissionsScreen
+                onContinue={() => {
                   appendSessionLog("Waiting for DFU connection.");
                   setScreen("dfu");
                 }}
-                onBack={() => setScreen("disclaimer")}
+                onBack={() => setScreen("firmware")}
               />
             ) : screen === "dfu" ? (
               <DfuScreen
