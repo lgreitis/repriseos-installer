@@ -163,10 +163,10 @@ jobs:
               "repriseos-installer_windows_x64-setup.exe",
               "repriseos-installer_windows_x64-setup.exe.sig",
               "repriseos-installer_windows_x64.exe",
-              "repriseos-installer_linux_x64.deb",
-              "repriseos-installer_linux_x64.rpm",
-              "repriseos-installer_linux_x64.AppImage",
-              "repriseos-installer_linux_x64.AppImage.sig",
+              "repriseos-installer_linux_amd64.deb",
+              "repriseos-installer_linux_x86_64.rpm",
+              "repriseos-installer_linux_amd64.AppImage",
+              "repriseos-installer_linux_amd64.AppImage.sig",
           }
           assert required <= assets, f"Missing release assets: {required - assets}"
           feed = json.load(open("latest.json"))
