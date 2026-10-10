@@ -28,6 +28,7 @@ export interface InstallEvent {
   completed: number | null;
   total: number | null;
   cancellable: boolean;
+  diagnostic?: boolean;
 }
 
 const labels: Record<string, string> = {
@@ -99,6 +100,10 @@ export function startInstallation(firmware: FirmwareInfo, packageDigest: string)
     const channel = createChannel<InstallEvent>();
     channel.onmessage = (event) => {
       if (!state.running || jobId !== nextJobId) return;
+      if (event.diagnostic) {
+        appendSessionLog(`${event.stage}: ${event.detail}`);
+        return;
+      }
       if (event.detail !== lastDetail) {
         appendSessionLog(`${event.stage}: ${event.detail}`);
         lastDetail = event.detail;

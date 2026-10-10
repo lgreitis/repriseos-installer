@@ -43,6 +43,7 @@ fn outcomes_preserve_result_files_and_recovery_details() {
         let mut job = job(&state);
         let directory = job.directory.clone();
         job.stage("backup", "Reading boot firmware").unwrap();
+        job.log("Helper status: rc=-301");
         let outcome = if failed {
             Err("Disconnected".into())
         } else {
@@ -51,6 +52,15 @@ fn outcomes_preserve_result_files_and_recovery_details() {
         let result = job.finish(outcome);
         let saved: serde_json::Value =
             serde_json::from_slice(&fs::read(directory.join("result.json")).unwrap()).unwrap();
+        let events: Vec<serde_json::Value> = fs::read_to_string(directory.join("events.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(events[0]["diagnostic"], false);
+        assert_eq!(events[1]["diagnostic"], true);
+        assert_eq!(events[1]["stage"], "backup");
+        assert_eq!(events[1]["detail"], "Helper status: rc=-301");
 
         if failed {
             let error = result.err().unwrap().to_string();

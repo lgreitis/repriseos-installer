@@ -17,6 +17,7 @@ pub struct InstallEvent {
     completed: Option<u64>,
     total: Option<u64>,
     cancellable: bool,
+    diagnostic: bool,
 }
 
 #[derive(Serialize)]
@@ -62,12 +63,21 @@ impl<'a> Job<'a> {
     }
 
     pub(super) fn emit(&mut self, detail: impl Into<String>, progress: Option<(u64, u64)>) {
+        self.emit_event(detail.into(), progress, false);
+    }
+
+    pub(super) fn log(&mut self, detail: impl Into<String>) {
+        self.emit_event(detail.into(), None, true);
+    }
+
+    fn emit_event(&mut self, detail: String, progress: Option<(u64, u64)>, diagnostic: bool) {
         let event = InstallEvent {
             stage: self.stage.clone(),
-            detail: detail.into(),
+            detail,
             completed: progress.map(|p| p.0),
             total: progress.map(|p| p.1),
             cancellable: self.cancellable,
+            diagnostic,
         };
         let saved = serde_json::to_writer(&mut self.journal, &event)
             .map_err(std::io::Error::other)

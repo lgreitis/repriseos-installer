@@ -8,6 +8,7 @@ import {
   installationLabel,
   startInstallation,
 } from "../src/lib/installation.ts";
+import { getSessionLog } from "../src/lib/sessionLog.ts";
 
 globalThis.window = { crypto: globalThis.crypto };
 globalThis.isTauri = true;
@@ -43,6 +44,17 @@ test("starts once, forwards selected hashes, and waits for backend completion", 
     channel.onmessage({ stage, detail, completed: 100, total: 100, cancellable: true });
     assert.equal(installationLabel(getInstallationState().event), detail);
   }
+  const progress = getInstallationState();
+  channel.onmessage({
+    stage: "bootloader",
+    detail: "Helper USB interface opened; bulk OUT endpoint 0x02",
+    completed: null,
+    total: null,
+    cancellable: false,
+    diagnostic: true,
+  });
+  assert.equal(getInstallationState(), progress);
+  assert.ok(getSessionLog().at(-1).includes("Helper USB interface opened"));
   assert.equal(getInstallationState().complete, false);
   finish({ backup_path: "/app-data/backups/device/run" });
   await setImmediate();
