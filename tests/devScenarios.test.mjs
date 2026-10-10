@@ -172,7 +172,9 @@ test("update scenarios cover availability, manual mode, failures and simulated r
 
 test("application services route native commands through the shared backend", async () => {
   const root = new URL("../src/", import.meta.url);
-  const files = await readdir(root, { recursive: true });
+  const files = (await readdir(root, { recursive: true })).map((file) =>
+    file.replaceAll("\\", "/"),
+  );
   for (const file of files.filter(
     (file) => /\.(ts|tsx)$/.test(file) && file !== "lib/backend.ts",
   )) {
