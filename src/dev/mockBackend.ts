@@ -13,6 +13,7 @@ function channel<T>(args: Record<string, unknown>, name = "onEvent"): EventChann
 export function createMockBackend(
   scenario: Scenario,
   wait: Wait = () => new Promise((resolve) => setTimeout(resolve, 250)),
+  saveDebug?: (sessionLog: string) => Promise<string | null>,
 ): Backend {
   let cancelled = false;
   let usbReady = !scenario.usbSetup;
@@ -71,6 +72,11 @@ export function createMockBackend(
       case "cancel_install":
         cancelled = true;
         return;
+      case "save_debug_zip":
+        if (scenario.debugExport === "cancel") return null;
+        if (scenario.debugExport === "error") throw new Error("Destination is not writable.");
+        if (saveDebug) return saveDebug(String(args.sessionLog ?? ""));
+        throw new Error("Native debug export is unavailable in this preview.");
       case "check_installer_update":
         await wait();
         if (scenario.update === "check-error")

@@ -1,5 +1,5 @@
 import App from "../App";
-import { installDevelopmentBackend } from "../lib/backend.ts";
+import { installDevelopmentBackend, savePreviewDebugZip } from "../lib/backend.ts";
 import { startDeviceChecks } from "../lib/deviceChecks.ts";
 import { startInstallation } from "../lib/installation.ts";
 import { checkInstallerUpdate, installInstallerUpdate } from "../lib/updates.ts";
@@ -10,7 +10,7 @@ import { findScenario, scenarios } from "./scenarios.ts";
 const scenario = findScenario(new URLSearchParams(location.search).get("scenario"));
 
 export function initializePreview() {
-  installDevelopmentBackend(createMockBackend(scenario));
+  installDevelopmentBackend(createMockBackend(scenario, undefined, savePreviewDebugZip));
   if (scenario.screen === "checks") startDeviceChecks(mockDevice);
   if (scenario.screen === "installation") startInstallation(mockFirmware, mockPackage.digest);
   if (scenario.startUpdate) void checkInstallerUpdate().then(installInstallerUpdate);

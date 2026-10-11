@@ -38,3 +38,13 @@ export function openExternalUrl(url: string): Promise<void> {
     ? developmentBackend.invoke("plugin:opener|open_url", { url })
     : openUrl(url);
 }
+
+export function savePreviewDebugZip(sessionLog: string): Promise<string | null> {
+  if (!import.meta.env?.DEV || !isTauri()) {
+    return Promise.reject(
+      new Error("Open this scenario in the desktop dev app to use the native Save dialog."),
+    );
+  }
+  // This explicit preview command exports synthetic data and cannot access USB.
+  return nativeInvoke("save_debug_zip", { sessionLog, preview: true });
+}

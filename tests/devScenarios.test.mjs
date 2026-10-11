@@ -182,3 +182,27 @@ test("application services route native commands through the shared backend", as
     assert.doesNotMatch(source, /from ["']@tauri-apps\//, file);
   }
 });
+
+test("debug export uses only the explicit preview handler and supports cancel and failure", async () => {
+  const calls = [];
+  const backend = createMockBackend(findScenario("debug-export"), immediate, async (log) => {
+    calls.push(log);
+    return "/chosen/debug.zip";
+  });
+  assert.equal(
+    await backend.invoke("save_debug_zip", { sessionLog: "test log", preview: false }),
+    "/chosen/debug.zip",
+  );
+  assert.deepEqual(calls, ["test log"]);
+  for (const id of ["debug-export-cancel", "debug-export-error"]) {
+    const preview = createMockBackend(findScenario(id), immediate, async () => {
+      assert.fail("Simulated cancel/error must not open a real dialog");
+    });
+    if (id.endsWith("cancel")) assert.equal(await preview.invoke("save_debug_zip"), null);
+    else await assert.rejects(preview.invoke("save_debug_zip"), /not writable/);
+  }
+  await assert.rejects(
+    createMockBackend(findScenario("debug-export"), immediate).invoke("save_debug_zip"),
+    /unavailable/,
+  );
+});

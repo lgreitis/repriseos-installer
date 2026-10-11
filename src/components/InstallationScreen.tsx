@@ -1,11 +1,13 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import React from "react";
 import { useHeadingFocus } from "../hooks/useHeadingFocus";
+import { errorDetail } from "../lib/errors";
 import {
   cancelInstallation,
   formatElapsedTime,
   getInstallationState,
   installationLabel,
+  saveDebugZip,
   subscribeToInstallation,
 } from "../lib/installation";
 import { Button } from "./ui/Button";
@@ -20,6 +22,22 @@ interface IInstallationScreenProps {
 const InstallationScreen: React.FC<IInstallationScreenProps> = ({ onComplete, onRecover }) => {
   const state = React.useSyncExternalStore(subscribeToInstallation, getInstallationState);
   const [now, setNow] = React.useState(Date.now());
+  const [savingDebug, setSavingDebug] = React.useState(false);
+  const [debugResult, setDebugResult] = React.useState<string | null>(null);
+  const [debugError, setDebugError] = React.useState<string | null>(null);
+  const saveDebug = async () => {
+    setSavingDebug(true);
+    setDebugResult(null);
+    setDebugError(null);
+    try {
+      const path = await saveDebugZip();
+      if (path) setDebugResult(`Debug ZIP saved: ${path}`);
+    } catch (error) {
+      setDebugError(`Could not save debug ZIP: ${errorDetail(error)}`);
+    } finally {
+      setSavingDebug(false);
+    }
+  };
   React.useEffect(() => {
     if (!state.running) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -98,15 +116,30 @@ const InstallationScreen: React.FC<IInstallationScreenProps> = ({ onComplete, on
       )}
       <InstallerScreen.Actions className="mt-6">
         {state.error ? (
-          <Button.Root onClick={onRecover}>
-            <Button.Label>DFU guide</Button.Label>
-          </Button.Root>
+          <>
+            <Button.Root disabled={savingDebug} onClick={onRecover}>
+              <Button.Label>DFU guide</Button.Label>
+            </Button.Root>
+            <Button.Root disabled={savingDebug} onClick={saveDebug}>
+              <Button.Label>{savingDebug ? "Saving…" : "Save debug ZIP"}</Button.Label>
+            </Button.Root>
+          </>
         ) : state.running && state.event.cancellable ? (
           <Button.Root disabled={state.cancelling} onClick={cancelInstallation}>
             <Button.Label>Cancel</Button.Label>
           </Button.Root>
         ) : null}
       </InstallerScreen.Actions>
+      {debugResult && (
+        <p role="status" className="mt-3 break-all text-[12px] text-muted">
+          {debugResult}
+        </p>
+      )}
+      {debugError && (
+        <p role="alert" className="mt-3 text-[12px] text-[#aa3e36]">
+          {debugError}
+        </p>
+      )}
     </InstallerScreen.Root>
   );
 };

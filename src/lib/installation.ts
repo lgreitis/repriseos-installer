@@ -1,6 +1,6 @@
 import { backendAvailable, createChannel, invoke } from "./backend.ts";
 import { errorDetail } from "./errors.ts";
-import { appendSessionLog } from "./sessionLog.ts";
+import { appendSessionLog, getSessionLog } from "./sessionLog.ts";
 
 export interface FirmwareInfo {
   filename: string;
@@ -164,6 +164,13 @@ export async function cancelInstallation() {
     appendSessionLog(`Cancellation failed: ${errorDetail(error)}`);
     publish({ ...state, cancelling: false });
   }
+}
+
+export async function saveDebugZip(): Promise<string | null> {
+  return invoke<string | null>("save_debug_zip", {
+    sessionLog: getSessionLog().join("\n"),
+    preview: false,
+  });
 }
 
 export function formatElapsedTime(milliseconds: number): string {

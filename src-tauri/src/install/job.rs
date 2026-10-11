@@ -314,6 +314,9 @@ impl<'a> Job<'a> {
                     &self.directory.join("result.json"),
                     &serde_json::json!({"state": "failed", "operation": self.operation, "bootloader_action": self.bootloader_action, "stage": self.stage, "detail": detail}),
                 );
+                if let Ok(mut directory) = self.state.failed_directory.lock() {
+                    *directory = Some(self.directory.clone());
+                }
                 Err(detail.into())
             }
         }

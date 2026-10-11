@@ -1,3 +1,4 @@
+pub(super) mod diagnostics;
 mod firmware;
 mod job;
 mod transfer;
@@ -19,6 +20,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>
 pub struct InstallState {
     pub running: AtomicBool,
     cancellation: Mutex<Cancellation>,
+    failed_directory: Mutex<Option<std::path::PathBuf>>,
 }
 
 #[derive(Default)]
@@ -57,6 +59,7 @@ pub async fn install(
         .acquire()
         .map_err(|e| e.to_string())?;
     let state = app.state::<InstallState>();
+    *state.failed_directory.lock().map_err(|e| e.to_string())? = None;
     *state.cancellation.lock().map_err(|e| e.to_string())? = Cancellation {
         requested: false,
         allowed: true,

@@ -63,6 +63,10 @@ fn outcomes_preserve_result_files_and_recovery_details() {
         assert_eq!(events[1]["detail"], "Helper status: rc=-301");
 
         if failed {
+            assert_eq!(
+                *state.failed_directory.lock().unwrap(),
+                Some(directory.clone())
+            );
             let error = result.err().unwrap().to_string();
             assert!(error.contains("Disconnected"));
             assert!(error.contains(directory.to_str().unwrap()));
@@ -71,6 +75,7 @@ fn outcomes_preserve_result_files_and_recovery_details() {
             assert_eq!(saved["stage"], "backup");
             assert_eq!(saved["detail"], error);
         } else {
+            assert!(state.failed_directory.lock().unwrap().is_none());
             assert_eq!(result.unwrap().backup_path, directory.to_string_lossy());
             assert_eq!(saved["state"], "installer_sent");
         }

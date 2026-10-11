@@ -14,8 +14,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-reprise-bundle = { git = "https://github.com/lgreitis/osos-lab.git", rev = "f205e58eeadb6c9b288b5ea4de4147eef7aa9730" }
-reprise-device = { git = "https://github.com/lgreitis/osos-lab.git", rev = "f205e58eeadb6c9b288b5ea4de4147eef7aa9730" }
+reprise-bundle = { path = "../../osos-lab/host/crates/reprise-bundle" }
+reprise-device = { path = "../../osos-lab/host/crates/reprise-device" }
 # Build reprise-device's libusb dependency for each target architecture.
 rusb = { version = "0.9.4", features = ["vendored"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
@@ -26,6 +26,8 @@ serde_json = "1"
 tauri-plugin-updater = "~2.10.1"
 semver = "1"
 tauri-plugin-opener = "~2.5.5"
+zip = { version = "8", default-features = false, features = ["deflate"] }
+tempfile = "3"
 
 [profile.release]
 codegen-units = 1

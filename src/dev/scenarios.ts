@@ -16,6 +16,7 @@ export interface Scenario {
   localPackage?: boolean;
   packageError?: string;
   installFailure?: { stage: string; detail: string };
+  debugExport?: "native" | "cancel" | "error";
   update?: "available" | "manual" | "current" | "check-error" | "download-error" | "installing";
   startUpdate?: boolean;
 }
@@ -205,6 +206,31 @@ export const scenarios: Scenario[] = [
     group: "Installation",
     label: "Progress to success",
     screen: "installation",
+  },
+  {
+    id: "debug-export",
+    group: "Installation",
+    label: "Save debug ZIP",
+    screen: "installation",
+    debugExport: "native",
+    hint: "In the desktop dev app, Save debug ZIP opens the native dialog and writes synthetic diagnostics. No iPod needed.",
+    installFailure: { stage: "storage", detail: "Invalid FAT32 sector size (code -301)." },
+  },
+  {
+    id: "debug-export-cancel",
+    group: "Installation",
+    label: "Debug ZIP save cancelled",
+    screen: "installation",
+    debugExport: "cancel",
+    installFailure: { stage: "storage", detail: "Invalid FAT32 sector size (code -301)." },
+  },
+  {
+    id: "debug-export-error",
+    group: "Installation",
+    label: "Debug ZIP save failed",
+    screen: "installation",
+    debugExport: "error",
+    installFailure: { stage: "storage", detail: "Invalid FAT32 sector size (code -301)." },
   },
   {
     id: "storage-full",

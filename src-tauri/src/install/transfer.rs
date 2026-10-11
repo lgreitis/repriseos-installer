@@ -17,9 +17,11 @@ pub(super) fn inspect_storage(
 ) -> Result<Session> {
     job.stage("storage", "Checking storage")?;
     let required = assembly::disk_bytes(bundle)?;
-    let (returned, storage) = session.inspect_storage_with_log(helper, required, |detail| {
-        job.log(detail);
-    })?;
+    let directory = job.directory.clone();
+    let (returned, storage) =
+        session.inspect_storage_with_diagnostics(helper, required, Some(&directory), |detail| {
+            job.log(detail)
+        })?;
 
     job.save_json("storage.json", &storage)?;
     job.emit(
