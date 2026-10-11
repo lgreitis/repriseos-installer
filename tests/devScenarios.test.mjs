@@ -206,3 +206,38 @@ test("debug export uses only the explicit preview handler and supports cancel an
     /unavailable/,
   );
 });
+
+test("experimental hardware scenario requires a current explicit approval", async () => {
+  const backend = createMockBackend(findScenario("unknown-hardware"), immediate);
+  const args = { onEvent: backend.createChannel() };
+  const initial = await backend.invoke("check_device", args);
+  assert.equal(initial.issue.kind, "unknown_hardware");
+  assert.equal(initial.compatible, false);
+  const accepted = await backend.invoke("check_device", {
+    ...args,
+    allowUnknownHardware: initial.check_id,
+  });
+  assert.equal(accepted.compatible, true);
+  assert.equal(accepted.hardware_override, true);
+  assert.equal(accepted.identity.model, initial.identity.model);
+  assert.equal(accepted.cleanup.state, "idle");
+  assert.equal(accepted.issue, null);
+  await assert.rejects(
+    backend.invoke("check_device", { ...args, allowUnknownHardware: initial.check_id }),
+    /changed/,
+  );
+  const retried = await backend.invoke("check_device", args);
+  assert.equal(retried.hardware_override, false);
+  assert.equal(retried.compatible, false);
+  await backend.invoke("check_device", args);
+  await assert.rejects(
+    backend.invoke("check_device", { ...args, allowUnknownHardware: retried.check_id }),
+    /changed/,
+  );
+  const beforePackageChange = await backend.invoke("check_device", args);
+  await backend.invoke("choose_local_package");
+  await assert.rejects(
+    backend.invoke("check_device", { ...args, allowUnknownHardware: beforePackageChange.check_id }),
+    /changed/,
+  );
+});

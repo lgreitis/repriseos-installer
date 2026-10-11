@@ -123,3 +123,27 @@ fn release_package_replays_with_each_devices_identity() {
     assert_eq!(companions[0][..0x25100], companions[1][..0x25100]);
     assert_eq!(companions[0][0x25220..], companions[1][0x25220..]);
 }
+
+#[test]
+fn experimental_package_check_still_requires_the_bootrom_and_respects_known_exclusions() {
+    let mut compatibility = firmware::current().compatibility.clone();
+    let mut checked = report(
+        Identity {
+            model: "MB147".into(),
+            serial: "test".into(),
+            hardware_id: [0; 16],
+            hardware_version: 0x02130000,
+            recorded_firmware: "1.1.2".into(),
+        },
+        &compatibility.bootrom_sha256,
+    );
+    let policy = firmware::HardwarePolicy::AllowUnknown;
+    assert!(require_device(&compatibility, &checked).is_err());
+    require_device_with_policy(&compatibility, &checked, policy).unwrap();
+    checked.bootrom_sha256 = None;
+    assert!(require_device_with_policy(&compatibility, &checked, policy).is_err());
+    checked.bootrom_sha256 = Some(compatibility.bootrom_sha256.clone());
+    checked.identity.as_mut().unwrap().hardware_version = 0x00130000;
+    compatibility.hardware_versions = vec![0x00130300];
+    assert!(require_device_with_policy(&compatibility, &checked, policy).is_err());
+}

@@ -2,6 +2,7 @@ import React from "react";
 import { useHeadingFocus } from "../hooks/useHeadingFocus";
 import { describeCheckFailure } from "../lib/checkFailure";
 import {
+  acceptUnknownHardware,
   type Check,
   type CheckId,
   getCheckState,
@@ -59,12 +60,17 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
     !error &&
     report?.compatible === true &&
     report.cleanup.state === "idle";
+  React.useEffect(() => {
+    if (complete && report?.hardware_override) onContinue();
+  }, [complete, report?.hardware_override, onContinue]);
   const current = checks.find((check) => check.status === "running");
   const failure =
     !running && !reconnecting && !replacement ? describeCheckFailure(report, error) : null;
   const results: Record<string, string> = {
     connection: "Connected",
-    compatibility: report?.identity?.model ?? "Supported",
+    compatibility: report?.hardware_override
+      ? "Experimental"
+      : (report?.identity?.model ?? "Supported"),
     firmware: report?.identity?.recorded_firmware ?? "Supported",
   };
 
@@ -106,7 +112,9 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
           : replacement
             ? "An iPod was detected. Check the connected iPod to continue."
             : complete
-              ? "All checks passed. Continue is available."
+              ? report?.hardware_override
+                ? "Experimental override accepted. Continuing installation."
+                : "All checks passed. Continue is available."
               : error
                 ? (failure?.message ?? "Checks stopped. Review the error and try again.")
                 : current
@@ -153,7 +161,16 @@ const DeviceChecksScreen: React.FC<IDeviceChecksScreenProps> = ({
         </dl>
       </HelpDisclosure>
       <InstallerScreen.Actions className="mt-7 min-h-12">
-        {failure?.action === "another-ipod" ? (
+        {failure?.action === "override" ? (
+          <>
+            <Button.Root onClick={onBack}>
+              <Button.Label>DFU guide</Button.Label>
+            </Button.Root>
+            <Button.Root intent="danger" onClick={acceptUnknownHardware}>
+              <Button.Label>Install anyway (experimental)</Button.Label>
+            </Button.Root>
+          </>
+        ) : failure?.action === "another-ipod" ? (
           <Button.Root onClick={onBack}>
             <Button.Label>Check another iPod</Button.Label>
           </Button.Root>

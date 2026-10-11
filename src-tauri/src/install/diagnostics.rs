@@ -7,6 +7,7 @@ use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 const REPORTS: &[&str] = &[
     "device.json",
+    "hardware-override.json",
     "inputs.json",
     "plan.json",
     "bootloader.json",

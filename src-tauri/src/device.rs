@@ -1,7 +1,7 @@
 use reprise_device::{CheckId, CheckReport, DeviceInfo, DeviceSelector, Event, Session};
 use serde::Serialize;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc, Mutex,
 };
 use tauri::{ipc::Channel, State};
@@ -13,17 +13,23 @@ pub struct CheckResponse {
     #[serde(flatten)]
     report: CheckReport,
     issue: Option<compatibility::CompatibilityIssue>,
+    check_id: u64,
+    hardware_override: bool,
 }
 
 #[derive(Default)]
 pub struct UsbState {
     busy: Arc<AtomicBool>,
+    next_check: AtomicU64,
     pub checked: Mutex<Option<CheckedDevice>>,
 }
 
 pub struct CheckedDevice {
     pub session: Session,
     pub report: CheckReport,
+    pub package_digest: String,
+    pub hardware_policy: reprise_device::firmware::HardwarePolicy,
+    check_id: u64,
 }
 
 pub struct UsbOperation(Arc<AtomicBool>);
@@ -78,17 +84,19 @@ pub async fn discover_devices(state: State<'_, UsbState>) -> Result<Vec<DeviceIn
 #[tauri::command]
 pub async fn check_device(
     selector: DeviceSelector,
+    allow_unknown_hardware: Option<u64>,
     on_event: Channel<Event>,
     state: State<'_, UsbState>,
     app: tauri::AppHandle,
 ) -> Result<CheckResponse, CommandError> {
     use tauri::Manager;
     let operation = state.acquire()?;
-    state
+    let previous = state
         .checked
         .lock()
         .map_err(|e| CommandError::new(CheckId::Usb, e))?
         .take();
+    let check_id = state.next_check.fetch_add(1, Ordering::Relaxed) + 1;
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
         let bundle = app
@@ -100,6 +108,33 @@ pub async fn check_device(
             .ok_or_else(|| {
                 CommandError::new(CheckId::Version, "Choose a firmware package first.")
             })?;
+        let expected_identity = if let Some(approval) = allow_unknown_hardware {
+            let previous = previous.as_ref().ok_or_else(|| {
+                CommandError::new(
+                    CheckId::Model,
+                    "Run device checks again before overriding hardware.",
+                )
+            })?;
+            if previous.check_id != approval
+                || previous.package_digest != bundle.digest()
+                || previous.report.device.as_ref().map(|d| d.selector) != Some(selector)
+                || !compatibility::can_override(&previous.report, &bundle.manifest().compatibility)
+            {
+                return Err(CommandError::new(
+                    CheckId::Model,
+                    "Device or package changed. Run device checks again.",
+                ));
+            }
+            previous.report.identity.clone()
+        } else {
+            None
+        };
+        drop(previous);
+        let policy = if expected_identity.is_some() {
+            reprise_device::firmware::HardwarePolicy::AllowUnknown
+        } else {
+            reprise_device::firmware::HardwarePolicy::RequireKnown
+        };
         let devices = reprise_device::discover().map_err(|e| CommandError::new(CheckId::Usb, e))?;
         if !devices
             .iter()
@@ -118,14 +153,23 @@ pub async fn check_device(
             };
             CommandError::new(stage, error)
         })?;
-        let mut report = session.check(|event| {
+        let mut report = session.check_with_hardware_policy(policy, |event| {
             // Finish cleanup even if the window stops receiving events.
             let _ = on_event.send(event);
         });
+        if expected_identity.is_some() && report.compatible && report.identity != expected_identity
+        {
+            return Err(CommandError::new(
+                CheckId::Model,
+                "The iPod identity changed. Run device checks again.",
+            ));
+        }
         if report.compatible {
-            if let Err(detail) =
-                crate::package::require_device(&bundle.manifest().compatibility, &report)
-            {
+            if let Err(detail) = crate::package::require_device_with_policy(
+                &bundle.manifest().compatibility,
+                &report,
+                policy,
+            ) {
                 report.compatible = false;
                 if let Some(check) = report
                     .checks
@@ -138,17 +182,34 @@ pub async fn check_device(
                 }
             }
         }
-        if report.compatible && report.cleanup == reprise_device::Cleanup::Idle {
+        let eligible = compatibility::can_override(&report, &bundle.manifest().compatibility);
+        if (report.compatible || eligible) && report.cleanup == reprise_device::Cleanup::Idle {
             *app.state::<UsbState>()
                 .checked
                 .lock()
                 .map_err(|e| CommandError::new(CheckId::Usb, e))? = Some(CheckedDevice {
                 session,
                 report: report.clone(),
+                package_digest: bundle.digest().into(),
+                hardware_policy: policy,
+                check_id,
             });
         }
-        let issue = compatibility::issue_for_report(&report);
-        Ok(CheckResponse { report, issue })
+        let issue = if eligible {
+            let identity = report.identity.as_ref().unwrap();
+            Some(compatibility::CompatibilityIssue::UnknownHardware {
+                model: identity.model.clone(),
+                hardware_version: identity.hardware_version,
+            })
+        } else {
+            compatibility::issue_for_report(&report)
+        };
+        Ok(CheckResponse {
+            report,
+            issue,
+            check_id,
+            hardware_override: expected_identity.is_some(),
+        })
     })
     .await
     .map_err(|e| CommandError::new(CheckId::Usb, e))?

@@ -43,6 +43,19 @@ export const scenarios: Scenario[] = [
     },
   },
   {
+    id: "unknown-hardware",
+    group: "Compatibility",
+    label: "Unknown hardware: experimental install",
+    screen: "checks",
+    hint: "Install anyway reruns simulated checks, then continues installation. No device operations.",
+    issue: { kind: "unknown_hardware", model: "MB147", hardware_version: 0x02130000 },
+    checkFailure: {
+      id: "model",
+      model: "MB147",
+      detail: "MB147; HwVr 0x02130000 (unsupported target)",
+    },
+  },
+  {
     id: "package-mismatch",
     group: "Compatibility",
     label: "Wrong package for iPod",

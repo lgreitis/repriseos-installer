@@ -113,7 +113,18 @@ fn run(
         .identity
         .as_ref()
         .ok_or("Missing checked device identity.")?;
-    crate::package::require_device(&bundle.manifest().compatibility, &checked.report)?;
+    if !checked.report.compatible
+        || checked.report.cleanup != reprise_device::Cleanup::Idle
+        || checked.package_digest != package_digest
+    {
+        return Err("Device or package changed. Run device checks again.".into());
+    }
+    let hardware_policy = checked.hardware_policy;
+    crate::package::require_device_with_policy(
+        &bundle.manifest().compatibility,
+        &checked.report,
+        hardware_policy,
+    )?;
     let data = app.path().app_data_dir()?;
     let directory = job::backup_directory(&data, &identity.hardware_id)?;
     job::save_json(&directory.join("device.json"), &checked.report)?;
@@ -136,6 +147,19 @@ fn run(
         identity.hardware_id,
         job.directory.display()
     ));
+    if hardware_policy == reprise_device::firmware::HardwarePolicy::AllowUnknown {
+        job.log(format!(
+            "EXPERIMENTAL: user accepted unknown HwVr {:#010x}; original device identity preserved",
+            identity.hardware_version
+        ));
+        job.save_json(
+            "hardware-override.json",
+            &serde_json::json!({
+                "accepted": true, "hardware_version": identity.hardware_version,
+                "package_digest": package_digest,
+            }),
+        )?;
+    }
     let outcome = (|| {
         let mut session = checked.session;
         job.stage("checkBootloader", "Checking installed bootloader")?;
@@ -150,7 +174,15 @@ fn run(
         job.plan(action)?;
         session = transfer::inspect_storage(session, &helper, &bundle, &mut job)?;
         let nor = firmware::backup(&mut session, identity, action, &mut job)?;
-        let artifacts = firmware::assemble(&mut session, &ipsw, &nor, &bundle, &data, &mut job)?;
+        let artifacts = firmware::assemble(
+            &mut session,
+            &ipsw,
+            &nor,
+            &bundle,
+            &data,
+            hardware_policy,
+            &mut job,
+        )?;
         transfer::install(session, &helper, &artifacts, action, &mut job)
     })();
     job.finish(outcome)

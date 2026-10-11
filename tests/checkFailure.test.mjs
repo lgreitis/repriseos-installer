@@ -34,3 +34,13 @@ test("cleanup failures and incomplete checks retain their actual errors", async 
   assert.equal(describeCheckFailure(null, "Read failed").action, "retry");
   assert.equal(describeCheckFailure(report, null), null);
 });
+
+test("unknown hardware offers the experimental action with an explicit warning", async () => {
+  const report = await reportFor("unknown-hardware");
+  const failure = describeCheckFailure(report, "Unknown HwVr");
+  assert.equal(failure.action, "override");
+  assert.match(failure.message, /0x02130000/);
+  assert.match(failure.message, /may fail or require recovery/);
+  report.cleanup = { state: "failed", detail: "Disconnected" };
+  assert.equal(describeCheckFailure(report, "Cleanup failed").action, "retry");
+});

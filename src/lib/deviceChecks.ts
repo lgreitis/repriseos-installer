@@ -28,6 +28,8 @@ export interface Check {
 export interface CheckReport {
   checks: Check[];
   compatible: boolean;
+  check_id?: number;
+  hardware_override?: boolean;
   cleanup: { state: "not_attempted" | "idle" | "failed"; detail?: string };
   identity: { model: string; serial: string; recorded_firmware: string } | null;
   issue: CompatibilityIssue | null;
@@ -35,6 +37,7 @@ export interface CheckReport {
 
 export type CompatibilityIssue =
   | { kind: "unsupported_model"; model: string }
+  | { kind: "unknown_hardware"; model: string; hardware_version: number }
   | { kind: "package_mismatch"; model: string };
 
 type CheckEvent =
@@ -88,7 +91,7 @@ export function discoverDevices(): Promise<DeviceInfo[]> {
   return discovery;
 }
 
-export function startDeviceChecks(device: DeviceInfo) {
+export function startDeviceChecks(device: DeviceInfo, overrideCheckId?: number) {
   if (state.running || state.reconnecting) return;
   const jobId = state.jobId + 1;
   appendSessionLog(
@@ -124,7 +127,11 @@ export function startDeviceChecks(device: DeviceInfo) {
       }
     };
     if (discovery) await discovery.catch(() => undefined);
-    return invoke<CheckReport>("check_device", { selector: device.selector, onEvent: channel });
+    return invoke<CheckReport>("check_device", {
+      selector: device.selector,
+      onEvent: channel,
+      allowUnknownHardware: overrideCheckId,
+    });
   };
   void run()
     .then((report) => {
@@ -152,7 +159,11 @@ export function startDeviceChecks(device: DeviceInfo) {
         `DFU cleanup: ${report.cleanup.state}${report.cleanup.detail ? ` — ${report.cleanup.detail}` : ""}`,
       );
       appendSessionLog(
-        error ? `Device checks stopped: ${error}` : "Device compatibility checks passed.",
+        error
+          ? `Device checks stopped: ${error}`
+          : report.hardware_override
+            ? "Experimental hardware override accepted; remaining checks passed."
+            : "Device compatibility checks passed.",
       );
       publish({ ...state, running: false, checks: report.checks, report, error });
     })
@@ -174,6 +185,23 @@ export function startDeviceChecks(device: DeviceInfo) {
         })),
       });
     });
+}
+
+export function acceptUnknownHardware() {
+  if (
+    state.running ||
+    state.reconnecting ||
+    state.replacement ||
+    !state.device ||
+    state.report?.cleanup.state !== "idle" ||
+    state.report.issue?.kind !== "unknown_hardware" ||
+    state.report.check_id === undefined
+  )
+    return;
+  appendSessionLog(
+    `User accepted experimental installation for HwVr 0x${state.report.issue.hardware_version.toString(16).padStart(8, "0")}.`,
+  );
+  startDeviceChecks(state.device, state.report.check_id);
 }
 
 export async function retryDeviceChecks() {

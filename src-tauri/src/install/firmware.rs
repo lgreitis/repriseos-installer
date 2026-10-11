@@ -53,6 +53,7 @@ pub(super) fn assemble(
     nor: &[u8],
     bundle: &VerifiedBundle,
     data: &Path,
+    hardware_policy: reprise_device::firmware::HardwarePolicy,
     job: &mut Job<'_>,
 ) -> Result<Artifacts> {
     job.stage("decrypt", "Preparing Apple firmware")?;
@@ -102,7 +103,12 @@ pub(super) fn assemble(
     job.emit("Validating Apple firmware", None);
     let prepared = PreparedInputs::from_plaintext(ipsw, &osos, &aupd)?;
     job.stage("assemble", "Preparing RepriseOS")?;
-    let artifacts = assembly::assemble(bundle, &prepared.apple_inputs()?, nor)?;
+    let artifacts = assembly::assemble_with_hardware_policy(
+        bundle,
+        &prepared.apple_inputs()?,
+        nor,
+        hardware_policy,
+    )?;
     job.save_firmware(&artifacts)?;
 
     Ok(artifacts)

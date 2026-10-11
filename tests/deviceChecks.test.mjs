@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { setImmediate } from "node:timers/promises";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import {
+  acceptUnknownHardware,
   checkIds,
   discoverDevices,
   getCheckState,
@@ -219,4 +220,42 @@ test("session log retains failed attempts and cleanup through a successful retry
   assert.ok(history.slice(before).some((entry) => entry.includes("Retry requested")));
   assert.ok(history.slice(before).some((entry) => entry.includes("DFU cleanup: idle")));
   assert.ok(history.at(-1).includes("Device compatibility checks passed"));
+});
+
+test("unknown hardware requires explicit acceptance and ordinary retries clear it", async () => {
+  const unknown = {
+    ...report(),
+    compatible: false,
+    check_id: 90,
+    issue: { kind: "unknown_hardware", model: "MB147", hardware_version: 0x02130000 },
+  };
+  unknown.checks = unknown.checks.map((c) =>
+    c.id === "model" ? { ...c, status: "failed", detail: "Unknown HwVr" } : c,
+  );
+  const approvals = [];
+  mockIPC((command, args) => {
+    assert.equal(command, "check_device");
+    approvals.push(args.allowUnknownHardware);
+    return args.allowUnknownHardware === 90
+      ? { ...report(), check_id: 91, hardware_override: true }
+      : unknown;
+  });
+  startDeviceChecks(device);
+  await setImmediate();
+  assert.equal(getCheckState().report.compatible, false);
+  assert.deepEqual(approvals, [undefined]);
+  acceptUnknownHardware();
+  acceptUnknownHardware();
+  await setImmediate();
+  assert.deepEqual(approvals, [undefined, 90]);
+  assert.equal(getCheckState().report.hardware_override, true);
+  startDeviceChecks(device);
+  await setImmediate();
+  assert.deepEqual(approvals, [undefined, 90, undefined]);
+  assert.equal(getCheckState().report.hardware_override, undefined);
+  mockIPC(() => ({ ...unknown, cleanup: { state: "failed" } }));
+  startDeviceChecks(device);
+  await setImmediate();
+  acceptUnknownHardware();
+  assert.equal(getCheckState().running, false);
 });

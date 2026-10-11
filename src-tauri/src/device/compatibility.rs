@@ -4,8 +4,47 @@ use serde::Serialize;
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum CompatibilityIssue {
-    UnsupportedModel { model: String },
-    PackageMismatch { model: String },
+    UnsupportedModel {
+        model: String,
+    },
+    UnknownHardware {
+        model: String,
+        hardware_version: u32,
+    },
+    PackageMismatch {
+        model: String,
+    },
+}
+
+pub fn can_override(report: &CheckReport, package: &reprise_bundle::Compatibility) -> bool {
+    let Some(identity) = &report.identity else {
+        return false;
+    };
+    !report.compatible
+        && report.cleanup == Cleanup::Idle
+        && reprise_device::firmware::for_hardware(identity.hardware_version).is_none()
+        && report.bootrom_sha256.as_deref() == Some(&package.bootrom_sha256)
+        && reprise_device::firmware::supports_bootrom(&package.bootrom_sha256)
+        && package.target == reprise_device::firmware::current().target
+        && [
+            CheckId::Usb,
+            CheckId::Access,
+            CheckId::Dfu,
+            CheckId::Rom,
+            CheckId::Model,
+            CheckId::Version,
+        ]
+        .into_iter()
+        .all(|id| {
+            let checks: Vec<_> = report.checks.iter().filter(|c| c.id == id).collect();
+            checks.len() == 1
+                && checks[0].status
+                    == if id == CheckId::Model {
+                        CheckStatus::Failed
+                    } else {
+                        CheckStatus::Passed
+                    }
+        })
 }
 
 pub fn issue_for_report(report: &CheckReport) -> Option<CompatibilityIssue> {
@@ -99,5 +138,63 @@ mod tests {
         assert!(issue_for_report(&checked).is_none());
         let checked = report("MC293", 0x00130200, "2.0.4", CheckId::Rom);
         assert!(issue_for_report(&checked).is_none());
+    }
+    #[test]
+    fn override_requires_only_unknown_hardware_to_fail() {
+        let package = &reprise_device::firmware::current().compatibility;
+        let mut checked = report("MB147", 0x02130000, "1.1.2", CheckId::Model);
+        checked.bootrom_sha256 = Some(package.bootrom_sha256.clone());
+        checked.checks = [
+            CheckId::Usb,
+            CheckId::Access,
+            CheckId::Dfu,
+            CheckId::Rom,
+            CheckId::Model,
+            CheckId::Version,
+        ]
+        .into_iter()
+        .map(|id| Check {
+            id,
+            status: if id == CheckId::Model {
+                CheckStatus::Failed
+            } else {
+                CheckStatus::Passed
+            },
+            detail: String::new(),
+        })
+        .collect();
+        for hardware in [0, 0x02130000, 0x12345678, u32::MAX] {
+            checked.identity.as_mut().unwrap().hardware_version = hardware;
+            assert!(can_override(&checked, package));
+        }
+        for index in [0, 1, 2, 3, 5] {
+            for status in [
+                CheckStatus::Failed,
+                CheckStatus::Skipped,
+                CheckStatus::Pending,
+            ] {
+                let mut bad = checked.clone();
+                bad.checks[index].status = status;
+                assert!(!can_override(&bad, package));
+            }
+        }
+        let mut bad = checked.clone();
+        bad.checks.pop();
+        assert!(!can_override(&bad, package));
+        let mut bad = checked.clone();
+        bad.cleanup = Cleanup::Failed("Disconnected".into());
+        assert!(!can_override(&bad, package));
+        let mut bad = checked.clone();
+        bad.identity = None;
+        assert!(!can_override(&bad, package));
+        let mut bad = checked.clone();
+        bad.bootrom_sha256 = Some("wrong ROM".into());
+        assert!(!can_override(&bad, package));
+        let mut bad = checked.clone();
+        bad.identity.as_mut().unwrap().hardware_version = 0x00130200;
+        assert!(!can_override(&bad, package));
+        let mut wrong_package = package.clone();
+        wrong_package.target = "other".into();
+        assert!(!can_override(&checked, &wrong_package));
     }
 }

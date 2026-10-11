@@ -16,7 +16,11 @@ export async function simulateChecks(
     await wait();
     const check: Check = {
       id,
-      status: checks.some((check) => check.status === "failed") ? "skipped" : "passed",
+      status:
+        checks.some((check) => check.status === "failed") &&
+        scenario.issue?.kind !== "unknown_hardware"
+          ? "skipped"
+          : "passed",
       detail: id === "version" ? "SysCfg records 2.0.4" : "Passed",
     };
     if (failure?.id === id) {

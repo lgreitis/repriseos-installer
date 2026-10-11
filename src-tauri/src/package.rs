@@ -50,7 +50,12 @@ fn package_info(bundle: &VerifiedBundle, filename: Option<String>) -> Result<Pac
 
 #[tauri::command]
 pub async fn choose_local_package(app: AppHandle) -> Result<Option<PackageInfo>, String> {
+    let operation = app
+        .state::<crate::device::UsbState>()
+        .acquire()
+        .map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation;
         let state = app.state::<PackageState>();
         let mut selected = state
             .0
@@ -65,6 +70,11 @@ pub async fn choose_local_package(app: AppHandle) -> Result<Option<PackageInfo>,
         else {
             return Ok(None);
         };
+        app.state::<crate::device::UsbState>()
+            .checked
+            .lock()
+            .map_err(|e| e.to_string())?
+            .take();
         let path = file.into_path().map_err(|e| e.to_string())?;
         let bundle = VerifiedBundle::load_local_zip(&path, env!("CARGO_PKG_VERSION"))
             .map_err(|e| e.to_string())?;
@@ -85,7 +95,17 @@ pub async fn prepare_package(
     local_digest: Option<String>,
     firmware_sha256: String,
 ) -> Result<PackageInfo, String> {
+    let operation = app
+        .state::<crate::device::UsbState>()
+        .acquire()
+        .map_err(|e| e.to_string())?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation;
+        app.state::<crate::device::UsbState>()
+            .checked
+            .lock()
+            .map_err(|e| e.to_string())?
+            .take();
         let state = app.state::<PackageState>();
         let mut selected = state
             .0
@@ -137,15 +157,28 @@ pub(crate) fn require_target(
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn require_device(
     compatibility: &reprise_bundle::Compatibility,
     report: &reprise_device::CheckReport,
+) -> Result<(), String> {
+    require_device_with_policy(
+        compatibility,
+        report,
+        reprise_device::firmware::HardwarePolicy::RequireKnown,
+    )
+}
+
+pub(crate) fn require_device_with_policy(
+    compatibility: &reprise_bundle::Compatibility,
+    report: &reprise_device::CheckReport,
+    policy: reprise_device::firmware::HardwarePolicy,
 ) -> Result<(), String> {
     let identity = report
         .identity
         .as_ref()
         .ok_or("Missing checked device identity.")?;
-    if !compatibility.matches_hardware(identity.hardware_version)
+    if !policy.permits(identity.hardware_version, compatibility)
         || report.bootrom_sha256.as_deref() != Some(&compatibility.bootrom_sha256)
     {
         return Err(format!(

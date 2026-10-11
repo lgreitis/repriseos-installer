@@ -3,7 +3,7 @@ import type { CheckReport } from "./deviceChecks.ts";
 export interface CheckFailure {
   title: string;
   message: string;
-  action: "another-ipod" | "firmware" | "retry";
+  action: "another-ipod" | "firmware" | "retry" | "override";
 }
 
 export function describeCheckFailure(
@@ -13,6 +13,12 @@ export function describeCheckFailure(
   if (!error) return null;
   const issue = report?.cleanup.state === "idle" ? report.issue : null;
   switch (issue?.kind) {
+    case "unknown_hardware":
+      return {
+        title: "This hardware revision hasn’t been verified.",
+        message: `Your ${issue.model} reports an unrecognized hardware version (0x${issue.hardware_version.toString(16).padStart(8, "0")}). Experimental installation may fail or require recovery.`,
+        action: "override",
+      };
     case "unsupported_model":
       return {
         title: "This iPod model isn’t supported.",

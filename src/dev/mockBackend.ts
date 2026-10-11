@@ -16,6 +16,8 @@ export function createMockBackend(
   saveDebug?: (sessionLog: string) => Promise<string | null>,
 ): Backend {
   let cancelled = false;
+  let checkId = 0;
+  let overrideAvailable = false;
   let usbReady = !scenario.usbSetup;
   let usbAttempts = 0;
 
@@ -49,8 +51,27 @@ export function createMockBackend(
         if (scenario.discovery === "multiple")
           return [mockDevice, { ...mockDevice, selector: { bus: 1, address: 2 } }];
         return [mockDevice];
-      case "check_device":
-        return simulateChecks(scenario, channel(args), wait);
+      case "check_device": {
+        const approved = args.allowUnknownHardware !== undefined;
+        const eligible = overrideAvailable && args.allowUnknownHardware === checkId;
+        overrideAvailable = false;
+        checkId += 1;
+        if (approved && !eligible)
+          throw new Error("Device or package changed. Run device checks again.");
+        const report = await simulateChecks(
+          approved ? { ...scenario, checkFailure: undefined, issue: undefined } : scenario,
+          channel(args),
+          wait,
+        );
+        if (approved && report.identity) {
+          report.identity.model = scenario.checkFailure?.model ?? report.identity.model;
+          const model = report.checks.find((check) => check.id === "model");
+          if (model) model.detail = "Experimental hardware override accepted";
+        }
+        overrideAvailable =
+          report.issue?.kind === "unknown_hardware" && report.cleanup.state === "idle";
+        return { ...report, check_id: checkId, hardware_override: approved };
+      }
       case "cached_firmware":
         return null;
       case "choose_firmware":
@@ -60,6 +81,7 @@ export function createMockBackend(
         return mockFirmware;
       case "choose_local_package":
       case "prepare_package":
+        overrideAvailable = false;
         await wait();
         if (scenario.packageError) throw new Error(scenario.packageError);
         return {
