@@ -97,7 +97,7 @@ fn run(
     if !helper.supports_storage_inspection() {
         return Err("Choose a newer package with storage inspection support.".into());
     }
-    assembly::nor_installer(&bundle)?;
+    let expected_bootloader = assembly::bootloader_fingerprint(&bundle)?;
     let checked = app
         .state::<UsbState>()
         .checked
@@ -119,11 +119,36 @@ fn run(
         &serde_json::json!({"ipsw": ipsw.sha256, "bundle": bundle.digest()}),
     )?;
     let mut job = Job::new(state, channel, directory)?;
+    job.log(format!(
+        "Installer {}; package {} ({}); IPSW {}",
+        env!("CARGO_PKG_VERSION"),
+        bundle.manifest().version,
+        bundle.digest(),
+        ipsw.sha256
+    ));
+    job.log(format!(
+        "Device: {} serial={} hardware_id={:02x?}; logs={}",
+        identity.model,
+        identity.serial,
+        identity.hardware_id,
+        job.directory.display()
+    ));
     let outcome = (|| {
-        let mut session = transfer::inspect_storage(checked.session, &helper, &bundle, &mut job)?;
-        let nor = firmware::backup(&mut session, identity, &mut job)?;
+        let mut session = checked.session;
+        job.stage("checkBootloader", "Checking installed bootloader")?;
+        let bootloader = session.inspect_bootloader(|p| {
+            job.progress("Verifying installed bootloader", p.completed, p.total)
+        })?;
+        job.save_json("bootloader.json", &bootloader)?;
+        job.log(format!("Detected bootloader: apple={}; code_sha256={}; code_bytes={}; entrypoint={:#x}; NOR bytes inspected={}",
+            bootloader.apple, bootloader.fingerprint.sha256, bootloader.fingerprint.bytes,
+            bootloader.fingerprint.entrypoint, bootloader.read_bytes));
+        let action = assembly::BootloaderAction::for_installed(&bootloader, &expected_bootloader);
+        job.plan(action)?;
+        session = transfer::inspect_storage(session, &helper, &bundle, &mut job)?;
+        let nor = firmware::backup(&mut session, identity, action, &mut job)?;
         let artifacts = firmware::assemble(&mut session, &ipsw, &nor, &bundle, &data, &mut job)?;
-        transfer::install(session, &helper, &artifacts, &mut job)
+        transfer::install(session, &helper, &artifacts, action, &mut job)
     })();
     job.finish(outcome)
 }

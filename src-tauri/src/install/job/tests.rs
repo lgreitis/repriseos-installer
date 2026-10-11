@@ -47,7 +47,7 @@ fn outcomes_preserve_result_files_and_recovery_details() {
         let outcome = if failed {
             Err("Disconnected".into())
         } else {
-            Ok(())
+            Ok(InstallOutcome::InstallerSent)
         };
         let result = job.finish(outcome);
         let saved: serde_json::Value =
@@ -200,4 +200,93 @@ fn firmware_is_replaced_per_device_while_run_reports_remain() {
         assert!(json["files"]["osos-cfw.bin"]["sha256"].is_string());
     }
     fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn update_plan_and_completion_are_preserved_in_support_logs() {
+    let state = InstallState::default();
+    for action in [
+        BootloaderAction::Install,
+        BootloaderAction::Keep,
+        BootloaderAction::Upgrade,
+    ] {
+        let mut job = job(&state);
+        let directory = job.directory.clone();
+        job.plan(action).unwrap();
+        let outcome = if action == BootloaderAction::Keep {
+            InstallOutcome::FilesUpdated
+        } else {
+            InstallOutcome::InstallerSent
+        };
+        job.finish(Ok(outcome)).unwrap();
+        let result: serde_json::Value =
+            serde_json::from_slice(&fs::read(directory.join("result.json")).unwrap()).unwrap();
+        assert_eq!(
+            result["operation"],
+            if action == BootloaderAction::Install {
+                "install"
+            } else {
+                "update"
+            }
+        );
+        assert_eq!(
+            result["bootloader_action"],
+            serde_json::to_value(action).unwrap()
+        );
+        let events = fs::read_to_string(directory.join("events.jsonl")).unwrap();
+        assert!(events.contains(if action == BootloaderAction::Install {
+            "INSTALL:"
+        } else {
+            "UPDATE:"
+        }));
+        fs::remove_dir_all(directory).unwrap();
+    }
+}
+
+#[test]
+fn saved_nor_reuse_requires_matching_identity_and_content_hash() {
+    let mut bytes: Vec<_> = [0x53436667u32, 124, 0x2000, 0x10001, 0, 5]
+        .into_iter()
+        .flat_map(u32::to_le_bytes)
+        .collect();
+    for (tag, data) in [
+        ("Mod#", b"MC293".as_slice()),
+        ("SrNm", b"TESTSERIAL"),
+        ("SwVr", b"2.0.4"),
+        ("HwVr", &[0, 0, 0, 0, 0, 2, 0x13, 0]),
+        ("HwId", &[0x72, 0x43, 2, 0x82]),
+    ] {
+        bytes.extend(tag.bytes().rev());
+        bytes.extend_from_slice(data);
+        bytes.resize(bytes.len() + 16 - data.len(), 0);
+    }
+    bytes.resize(NOR_SIZE, 0xff);
+    let identity = SysCfg::parse(&bytes).unwrap().identity().unwrap();
+    let state = InstallState::default();
+    let mut job = job(&state);
+    let directory = job.directory.clone();
+    assert!(job.reuse_nor(&identity).unwrap().is_none());
+    let snapshot = job
+        .device_directory
+        .join("nor")
+        .join(reprise_bundle::sha256(&bytes));
+    fs::create_dir_all(&snapshot).unwrap();
+    fs::write(snapshot.join("nor.bin"), &bytes).unwrap();
+    let mut other = identity.clone();
+    other.hardware_id[0] ^= 1;
+    assert!(job.reuse_nor(&other).unwrap().is_none());
+    fs::write(snapshot.join("nor.bin"), b"truncated").unwrap();
+    assert!(job.reuse_nor(&identity).unwrap().is_none());
+    let mut corrupt = bytes.clone();
+    corrupt[NOR_SIZE - 1] ^= 1;
+    fs::write(snapshot.join("nor.bin"), corrupt).unwrap();
+    assert!(job.reuse_nor(&identity).unwrap().is_none());
+    fs::write(snapshot.join("nor.bin"), &bytes).unwrap();
+    assert_eq!(job.reuse_nor(&identity).unwrap().unwrap(), bytes);
+    let reference: serde_json::Value =
+        serde_json::from_slice(&fs::read(directory.join("nor.json")).unwrap()).unwrap();
+    assert_eq!(reference["reused"], true);
+    drop(job);
+    fs::remove_dir_all(directory).unwrap();
+    fs::remove_dir_all(snapshot).unwrap();
 }

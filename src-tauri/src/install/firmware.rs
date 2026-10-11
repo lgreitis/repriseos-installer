@@ -13,9 +13,21 @@ use std::{fs, path::Path};
 pub(super) fn backup(
     session: &mut Session,
     identity: &Identity,
+    action: assembly::BootloaderAction,
     job: &mut Job<'_>,
 ) -> Result<Vec<u8>> {
+    if action == assembly::BootloaderAction::Keep {
+        job.stage("backup", "Checking saved boot firmware backup")?;
+        if let Some(bytes) = job.reuse_nor(identity)? {
+            return Ok(bytes);
+        }
+    }
     job.stage("backup", "Backing up boot firmware")?;
+    job.log(if action == assembly::BootloaderAction::Keep {
+        "BACKUP: no valid backup for this device; reading full NOR"
+    } else {
+        "BACKUP: fresh full NOR snapshot required before bootloader installation"
+    });
     let nor = session.dump_nor(|p| {
         let detail = match p.stage {
             "echo" => "Checking backup connection",

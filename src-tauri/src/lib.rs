@@ -40,6 +40,7 @@ pub fn run() {
             package::choose_local_package,
             package::prepare_package,
             firmware::choose_firmware,
+            firmware::cached_firmware,
             install::install,
             updates::check_installer_update,
             updates::install_installer_update,

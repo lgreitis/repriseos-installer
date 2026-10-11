@@ -2,7 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import React from "react";
 import { useHeadingFocus } from "../hooks/useHeadingFocus";
 import { errorDetail } from "../lib/errors";
-import { chooseFirmware, type FirmwareInfo } from "../lib/installation";
+import { cachedFirmware, chooseFirmware, type FirmwareInfo } from "../lib/installation";
 import { chooseLocalPackage, type PackageInfo, preparePackage } from "../lib/package";
 import { appendSessionLog } from "../lib/sessionLog";
 import { Button } from "./ui/Button";
@@ -34,10 +34,42 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
   const [error, setError] = React.useState("");
   const [packageError, setPackageError] = React.useState("");
   const [loading, setLoading] = React.useState<"choose" | "prepare" | null>(null);
-  const [firmwareAction, setFirmwareAction] = React.useState<"choose" | "validate" | null>(null);
+  const [usingSavedFirmware, setUsingSavedFirmware] = React.useState(!!file);
+  const [firmwareAction, setFirmwareAction] = React.useState<
+    "cache" | "choose" | "validate" | null
+  >(file ? null : "cache");
   const choosingFirmware = firmwareAction !== null;
-  const validatingFirmware = firmwareAction === "validate";
+  const validatingFirmware = firmwareAction === "validate" || firmwareAction === "cache";
   const reducedMotion = useReducedMotion();
+
+  const initialFile = React.useRef(file);
+  const selectFirmware = React.useEffectEvent(onSelect);
+  React.useEffect(() => {
+    if (initialFile.current) return;
+    let active = true;
+    void cachedFirmware()
+      .then((cached) => {
+        if (!active || !cached) return;
+        setFilename(cached.filename);
+        setUsingSavedFirmware(true);
+        selectFirmware(cached);
+        appendSessionLog(
+          `Using verified cached Apple firmware: ${cached.filename} (${cached.sha256}).`,
+        );
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setError(errorDetail(error));
+          appendSessionLog(`Cached firmware unavailable: ${errorDetail(error)}`);
+        }
+      })
+      .finally(() => {
+        if (active) setFirmwareAction(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const choosePackage = async () => {
     setLoading("choose");
@@ -111,6 +143,7 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
               try {
                 const selected = await chooseFirmware((name) => {
                   setFilename(name);
+                  setUsingSavedFirmware(false);
                   onSelect(null);
                   setError("");
                   setFirmwareAction("validate");
@@ -118,6 +151,7 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
                 });
                 if (selected) {
                   setFilename(selected.filename);
+                  setUsingSavedFirmware(false);
                   setError("");
                   onSelect(selected);
                 }
@@ -140,11 +174,15 @@ const FirmwareScreen: React.FC<IFirmwareScreenProps> = ({
               <CheckStatusIndicator
                 status={validatingFirmware ? "checking" : error ? "failed" : "passed"}
               />
-              {validatingFirmware
-                ? "Checking firmware compatibility…"
-                : error
-                  ? "Firmware validation failed."
-                  : `Compatible firmware · Apple ${file?.version}`}
+              {firmwareAction === "cache"
+                ? "Checking saved Apple 2.0.5 firmware…"
+                : validatingFirmware
+                  ? "Checking firmware compatibility…"
+                  : error
+                    ? "Firmware validation failed."
+                    : usingSavedFirmware
+                      ? `Using verified saved Apple ${file?.version} firmware`
+                      : `Compatible Apple ${file?.version} firmware`}
             </p>
           )}
           <AnimatePresence initial={false}>

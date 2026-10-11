@@ -1,5 +1,6 @@
-import type React from "react";
+import React from "react";
 import { useHeadingFocus } from "../hooks/useHeadingFocus";
+import { getInstallationState, subscribeToInstallation } from "../lib/installation";
 import { Button } from "./ui/Button";
 import { InstallerScreen } from "./ui/InstallerScreen";
 import { SuccessSymbol } from "./ui/SuccessSymbol";
@@ -16,6 +17,7 @@ const bootOptions = [
 
 const SuccessScreen: React.FC<ISuccessScreenProps> = ({ onDone }) => {
   const { headingRef } = useHeadingFocus();
+  const { outcome } = React.useSyncExternalStore(subscribeToInstallation, getInstallationState);
 
   return (
     <InstallerScreen.Root aria-labelledby="success-title">
@@ -26,7 +28,9 @@ const SuccessScreen: React.FC<ISuccessScreenProps> = ({ onDone }) => {
         You’re all set.
       </InstallerScreen.Title>
       <InstallerScreen.Description className="max-w-125">
-        Your iPod will restart. Once it restarts, disconnect USB.
+        {outcome === "files_updated"
+          ? "Update complete. Your iPod will restart. Once it restarts, disconnect USB."
+          : "Your iPod will restart. Once it restarts, disconnect USB."}
       </InstallerScreen.Description>
       <div className="mx-auto mt-7 max-w-125">
         <p className="text-[13px] leading-6 text-body">Choose a system as your iPod starts:</p>

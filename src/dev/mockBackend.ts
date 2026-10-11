@@ -50,6 +50,8 @@ export function createMockBackend(
         return [mockDevice];
       case "check_device":
         return simulateChecks(scenario, channel(args), wait);
+      case "cached_firmware":
+        return null;
       case "choose_firmware":
         channel<string>(args, "onSelected").onmessage(mockFirmware.filename);
         await wait();

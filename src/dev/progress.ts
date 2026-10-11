@@ -37,7 +37,11 @@ export async function simulateInstallation(
       }
     }
   }
-  return { backup_path: "Simulated backup (no files written)" };
+  return {
+    operation: "install",
+    outcome: "installer_sent",
+    backup_path: "Simulated backup (no files written)",
+  };
 }
 
 export async function simulateUpdate(

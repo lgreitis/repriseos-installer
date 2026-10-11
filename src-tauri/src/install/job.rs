@@ -1,6 +1,6 @@
 use super::{InstallState, Result};
-use reprise_bundle::assembly::Artifacts;
-use reprise_device::NorDump;
+use reprise_bundle::assembly::{Artifacts, BootloaderAction};
+use reprise_device::{Identity, NorDump, SysCfg, NOR_SIZE};
 use serde::Serialize;
 use std::{
     fs::{self, File, OpenOptions},
@@ -20,9 +20,18 @@ pub struct InstallEvent {
     diagnostic: bool,
 }
 
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum InstallOutcome {
+    InstallerSent,
+    FilesUpdated,
+}
+
 #[derive(Serialize)]
 pub struct InstallResult {
     backup_path: String,
+    outcome: InstallOutcome,
+    operation: Option<&'static str>,
 }
 
 pub(super) struct Job<'a> {
@@ -34,6 +43,8 @@ pub(super) struct Job<'a> {
     stage: String,
     log_error: Option<String>,
     cancellable: bool,
+    operation: Option<&'static str>,
+    bootloader_action: Option<BootloaderAction>,
 }
 
 impl<'a> Job<'a> {
@@ -59,7 +70,40 @@ impl<'a> Job<'a> {
             stage: "prepare".into(),
             log_error: None,
             cancellable: true,
+            operation: None,
+            bootloader_action: None,
         })
+    }
+
+    pub(super) fn plan(&mut self, action: BootloaderAction) -> Result<()> {
+        let operation = match action {
+            BootloaderAction::Install => "install",
+            BootloaderAction::Keep | BootloaderAction::Upgrade => "update",
+        };
+        self.operation = Some(operation);
+        self.bootloader_action = Some(action);
+        self.save_json(
+            "plan.json",
+            &serde_json::json!({
+                "operation": operation,
+                "bootloader_action": action,
+            }),
+        )?;
+        self.emit(
+            match action {
+                BootloaderAction::Keep => {
+                    "UPDATE: bootloader matches package; updating disk files only"
+                }
+                BootloaderAction::Install => {
+                    "INSTALL: Apple bootloader detected; installing RepriseOS and dual boot"
+                }
+                BootloaderAction::Upgrade => {
+                    "UPDATE: bootloader differs from package; installing new bootloader after a fresh NOR backup"
+                }
+            },
+            None,
+        );
+        Ok(())
     }
 
     pub(super) fn emit(&mut self, detail: impl Into<String>, progress: Option<(u64, u64)>) {
@@ -137,8 +181,70 @@ impl<'a> Job<'a> {
             &serde_json::json!({
                 "backup": format!("../nor/{}/nor.bin", nor.report.sha256),
                 "report": nor.report,
+                "reused": false,
             }),
         )
+    }
+
+    pub(super) fn reuse_nor(&mut self, identity: &Identity) -> Result<Option<Vec<u8>>> {
+        let snapshots = self.device_directory.join("nor");
+        let entries = match fs::read_dir(&snapshots) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
+        let mut paths = entries
+            .map(|entry| entry.map(|e| e.path()))
+            .collect::<std::io::Result<Vec<_>>>()?;
+        paths.sort();
+        for path in paths {
+            let Some(hash) = path.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+                continue;
+            }
+            let file = path.join("nor.bin");
+            let valid = (|| -> Result<Vec<u8>> {
+                if fs::metadata(&file)?.len() != NOR_SIZE as u64 {
+                    return Err("Invalid backup size".into());
+                }
+                let bytes = fs::read(&file)?;
+                if reprise_bundle::sha256(&bytes) != hash
+                    || SysCfg::parse(&bytes)?.identity()? != *identity
+                {
+                    return Err("Backup checksum or device identity mismatch".into());
+                }
+                Ok(bytes)
+            })();
+            match valid {
+                Ok(bytes) => {
+                    self.save_json(
+                        "nor.json",
+                        &serde_json::json!({
+                            "backup": format!("../nor/{hash}/nor.bin"),
+                            "reused": true,
+                            "sha256": hash,
+                            "identity": identity,
+                        }),
+                    )?;
+                    self.emit(
+                        format!(
+                            "Using verified backup for {} ({})",
+                            identity.model, identity.serial
+                        ),
+                        None,
+                    );
+                    self.log(format!("Saved NOR backup: {}", file.display()));
+                    return Ok(Some(bytes));
+                }
+                Err(error) => self.log(format!(
+                    "Ignoring unusable NOR backup {}: {error}",
+                    file.display()
+                )),
+            }
+        }
+        Ok(None)
     }
 
     pub(super) fn save_firmware(&self, artifacts: &Artifacts) -> Result<()> {
@@ -155,7 +261,15 @@ impl<'a> Job<'a> {
     }
 
     pub(super) fn begin_bootloader(&mut self) -> Result<()> {
-        self.stage("bootloader", "Preparing bootloader installer")?;
+        self.begin_handoff("bootloader", "Preparing bootloader installer")
+    }
+
+    pub(super) fn begin_restart(&mut self) -> Result<()> {
+        self.begin_handoff("restart", "Restarting iPod")
+    }
+
+    fn begin_handoff(&mut self, stage: &str, detail: &str) -> Result<()> {
+        self.stage(stage, detail)?;
         {
             let mut cancellation = self.state.cancellation.lock().map_err(|e| e.to_string())?;
             if cancellation.requested {
@@ -164,33 +278,41 @@ impl<'a> Job<'a> {
             cancellation.allowed = false;
         }
         self.cancellable = false;
-        self.emit("Preparing bootloader installer", None);
+        self.emit(detail, None);
         self.journal.sync_all()?;
         self.check()
     }
 
-    pub(super) fn finish(mut self, outcome: Result<()>) -> Result<InstallResult> {
+    pub(super) fn finish(mut self, outcome: Result<InstallOutcome>) -> Result<InstallResult> {
         match outcome {
-            Ok(()) => {
+            Ok(outcome) => {
+                self.log(match outcome {
+                    InstallOutcome::FilesUpdated => "UPDATE COMPLETE: disk files verified; NOR unchanged; restart requested; boot not verified",
+                    InstallOutcome::InstallerSent => "BOOTLOADER HANDOFF: disk files verified; NOR installer sent; NOR completion not read back",
+                });
                 save_json(
                     &self.directory.join("result.json"),
-                    &serde_json::json!({"state": "installer_sent"}),
+                    &serde_json::json!({"state": outcome, "operation": self.operation, "bootloader_action": self.bootloader_action}),
                 )?;
                 self.journal.sync_all()?;
                 Ok(InstallResult {
                     backup_path: self.directory.to_string_lossy().into_owned(),
+                    outcome,
+                    operation: self.operation,
                 })
             }
             Err(error) => {
                 let detail = format!(
-                    "{error} Backups and logs: {}. Re-enter DFU before retrying.",
+                    "{} failed during {}: {error} Backups and logs: {}. Re-enter DFU before retrying.",
+                    self.operation.unwrap_or("install/update").to_uppercase(),
+                    self.stage,
                     self.directory.display()
                 );
                 self.emit(&detail, None);
                 let _ = self.journal.sync_all();
                 let _ = save_json(
                     &self.directory.join("result.json"),
-                    &serde_json::json!({"state": "failed", "stage": self.stage, "detail": detail}),
+                    &serde_json::json!({"state": "failed", "operation": self.operation, "bootloader_action": self.bootloader_action, "stage": self.stage, "detail": detail}),
                 );
                 Err(detail.into())
             }

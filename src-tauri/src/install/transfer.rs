@@ -1,4 +1,7 @@
-use super::{job::Job, Result};
+use super::{
+    job::{InstallOutcome, Job},
+    Result,
+};
 use reprise_bundle::{
     assembly::{self, Artifacts},
     VerifiedBundle,
@@ -34,8 +37,9 @@ pub(super) fn install(
     mut session: Session,
     helper: &UploadHelper,
     artifacts: &Artifacts,
+    action: assembly::BootloaderAction,
     job: &mut Job<'_>,
-) -> Result<()> {
+) -> Result<InstallOutcome> {
     for (stage, name, destination, bytes) in [
         (
             "uploadLoader",
@@ -78,6 +82,15 @@ pub(super) fn install(
         session = uploaded.session;
         job.save_json(&format!("{stage}.json"), &uploaded.report)?;
     }
+    if action == assembly::BootloaderAction::Keep {
+        job.begin_restart()?;
+        session.restart()?;
+        job.emit(
+            "UPDATE: disk files verified; restart requested; NOR unchanged",
+            None,
+        );
+        return Ok(InstallOutcome::FilesUpdated);
+    }
     job.begin_bootloader()?;
     session.install_bootloader(&artifacts.nor_installer, |done, total| {
         job.emit(
@@ -86,5 +99,5 @@ pub(super) fn install(
         )
     })?;
     job.emit("Bootloader installer sent", None);
-    Ok(())
+    Ok(InstallOutcome::InstallerSent)
 }

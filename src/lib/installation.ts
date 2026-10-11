@@ -22,6 +22,11 @@ export async function chooseFirmware(
   }
 }
 
+export async function cachedFirmware(): Promise<FirmwareInfo | null> {
+  if (!backendAvailable()) return null;
+  return invoke<FirmwareInfo | null>("cached_firmware");
+}
+
 export interface InstallEvent {
   stage: string;
   detail: string;
@@ -34,12 +39,14 @@ export interface InstallEvent {
 const labels: Record<string, string> = {
   prepare: "Preparing installation",
   storage: "Checking storage",
+  checkBootloader: "Checking installed bootloader",
   backup: "Backing up boot firmware",
   decrypt: "Preparing Apple firmware",
   assemble: "Preparing RepriseOS",
   uploadLoader: "Uploading companion loader",
   uploadOsos: "Uploading RepriseOS",
   bootloader: "Preparing bootloader installer",
+  restart: "Restarting iPod",
 };
 
 interface InstallationState {
@@ -50,6 +57,7 @@ interface InstallationState {
   error: string | null;
   complete: boolean;
   cancelling: boolean;
+  outcome: "installer_sent" | "files_updated" | null;
 }
 
 let state: InstallationState = {
@@ -60,6 +68,7 @@ let state: InstallationState = {
   error: null,
   complete: false,
   cancelling: false,
+  outcome: null,
 };
 const listeners = new Set<() => void>();
 const publish = (next: InstallationState) => {
@@ -91,8 +100,9 @@ export function startInstallation(firmware: FirmwareInfo, packageDigest: string)
     error: null,
     complete: false,
     cancelling: false,
+    outcome: null,
   });
-  appendSessionLog("Installation started.");
+  appendSessionLog("Install/update started; checking device state to select the operation.");
   const jobId = ++nextJobId;
   let lastDetail = "";
   const run = async () => {
@@ -110,7 +120,11 @@ export function startInstallation(firmware: FirmwareInfo, packageDigest: string)
       }
       publish({ ...state, event });
     };
-    return invoke<{ backup_path: string }>("install", {
+    return invoke<{
+      backup_path: string;
+      outcome: "installer_sent" | "files_updated";
+      operation: "install" | "update";
+    }>("install", {
       firmwareSha256: firmware.sha256,
       packageDigest,
       onEvent: channel,
@@ -118,8 +132,20 @@ export function startInstallation(firmware: FirmwareInfo, packageDigest: string)
   };
   void run()
     .then((result) => {
-      appendSessionLog(`Bootloader installer sent. Backups: ${result.backup_path}`);
-      publish({ ...state, running: false, complete: true, finishedAt: Date.now() });
+      const completion =
+        result.outcome === "files_updated"
+          ? "COMPLETE: disk files verified; bootloader unchanged; restart requested; boot not verified."
+          : "BOOTLOADER HANDOFF: disk files verified; bootloader installer sent; NOR completion not read back.";
+      appendSessionLog(
+        `${result.operation.toUpperCase()} ${completion} Backups and logs: ${result.backup_path}`,
+      );
+      publish({
+        ...state,
+        running: false,
+        complete: true,
+        outcome: result.outcome,
+        finishedAt: Date.now(),
+      });
     })
     .catch((error: unknown) => {
       const detail = errorDetail(error);

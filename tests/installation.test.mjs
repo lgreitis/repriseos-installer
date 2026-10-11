@@ -56,7 +56,11 @@ test("starts once, forwards selected hashes, and waits for backend completion", 
   assert.equal(getInstallationState(), progress);
   assert.ok(getSessionLog().at(-1).includes("Helper USB interface opened"));
   assert.equal(getInstallationState().complete, false);
-  finish({ backup_path: "/app-data/backups/device/run" });
+  finish({
+    backup_path: "/app-data/backups/device/run",
+    operation: "install",
+    outcome: "installer_sent",
+  });
   await setImmediate();
   assert.equal(getInstallationState().complete, true);
   assert.equal(getInstallationState().running, false);
@@ -108,6 +112,22 @@ test("cancellation waits for cleanup and is disabled during NOR installation", a
   assert.equal(cancels, 1);
   reject("DFU transfer failed");
   await setImmediate();
+});
+
+test("disk-only update logs its outcome without claiming a bootloader install", async () => {
+  mockIPC((command) => {
+    assert.equal(command, "install");
+    return { backup_path: "/backups/update", operation: "update", outcome: "files_updated" };
+  });
+  const first = getSessionLog().length;
+  startInstallation(firmware, "package-hash");
+  await setImmediate();
+  assert.equal(getInstallationState().complete, true);
+  assert.equal(getInstallationState().outcome, "files_updated");
+  const log = getSessionLog().slice(first).join("\n");
+  assert.match(log, /UPDATE COMPLETE/);
+  assert.match(log, /bootloader unchanged; restart requested/);
+  assert.doesNotMatch(log, /BOOTLOADER HANDOFF/);
 });
 
 test("channel creation failure stops the job and allows retry", async () => {
