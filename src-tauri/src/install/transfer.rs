@@ -16,7 +16,9 @@ pub(super) fn inspect_storage(
     job: &mut Job<'_>,
 ) -> Result<Session> {
     job.stage("storage", "Checking storage")?;
-    let required = assembly::disk_bytes(bundle)?;
+    let required = assembly::disk_bytes(bundle)?
+        .checked_add(crate::theme::disk_bytes(bundle)?)
+        .ok_or("Package disk size overflow")?;
     let directory = job.directory.clone();
     let (returned, storage) =
         session.inspect_storage_with_diagnostics(helper, required, Some(&directory), |detail| {
@@ -39,10 +41,26 @@ pub(super) fn install(
     mut session: Session,
     helper: &UploadHelper,
     artifacts: &Artifacts,
+    themes: Option<&crate::theme::Themes>,
     action: assembly::BootloaderAction,
     job: &mut Job<'_>,
 ) -> Result<InstallOutcome> {
-    for (stage, name, destination, bytes) in [
+    let mut files = Vec::new();
+    if let Some(themes) = themes {
+        files.push((
+            "uploadDefaultTheme",
+            "stock artwork",
+            "/themes/default/theme.bin",
+            &themes.default,
+        ));
+        files.push((
+            "uploadDarkTheme",
+            "Dark Mode artwork",
+            "/themes/dark/theme.bin",
+            &themes.dark,
+        ));
+    }
+    files.extend([
         (
             "uploadLoader",
             "companion loader",
@@ -50,7 +68,8 @@ pub(super) fn install(
             &artifacts.companion,
         ),
         ("uploadOsos", "RepriseOS", "/osos-cfw.bin", &artifacts.osos),
-    ] {
+    ]);
+    for (stage, name, destination, bytes) in files {
         job.stage(stage, &format!("Preparing {name}"))?;
         let log_job = std::cell::RefCell::new(&mut *job);
         let uploaded = session.upload_with_log(

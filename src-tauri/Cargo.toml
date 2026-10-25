@@ -1,6 +1,6 @@
 [package]
 name = "repriseos-installer"
-version = "0.2.7"
+version = "0.2.8"
 license = "GPL-3.0-only"
 description = "RepriseOS installer for iPod Classic"
 edition = "2021"

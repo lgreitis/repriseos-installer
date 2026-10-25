@@ -174,7 +174,7 @@ fn run(
         job.plan(action)?;
         session = transfer::inspect_storage(session, &helper, &bundle, &mut job)?;
         let nor = firmware::backup(&mut session, identity, action, &mut job)?;
-        let artifacts = firmware::assemble(
+        let (artifacts, themes) = firmware::assemble(
             &mut session,
             &ipsw,
             &nor,
@@ -183,7 +183,14 @@ fn run(
             hardware_policy,
             &mut job,
         )?;
-        transfer::install(session, &helper, &artifacts, action, &mut job)
+        transfer::install(
+            session,
+            &helper,
+            &artifacts,
+            themes.as_ref(),
+            action,
+            &mut job,
+        )
     })();
     job.finish(outcome)
 }

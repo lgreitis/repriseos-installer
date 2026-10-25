@@ -16,6 +16,8 @@ const REPORTS: &[&str] = &[
     "assembly.json",
     "uploadLoader.json",
     "uploadOsos.json",
+    "uploadDefaultTheme.json",
+    "uploadDarkTheme.json",
     "result.json",
 ];
 const MAX_FILE_BYTES: u64 = 8 * 1024 * 1024;

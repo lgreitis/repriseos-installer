@@ -43,6 +43,8 @@ const labels: Record<string, string> = {
   backup: "Backing up boot firmware",
   decrypt: "Preparing Apple firmware",
   assemble: "Preparing RepriseOS",
+  uploadDefaultTheme: "Uploading stock artwork",
+  uploadDarkTheme: "Uploading Dark Mode artwork",
   uploadLoader: "Uploading companion loader",
   uploadOsos: "Uploading RepriseOS",
   bootloader: "Preparing bootloader installer",

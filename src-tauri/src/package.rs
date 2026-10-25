@@ -40,6 +40,7 @@ fn package_info(bundle: &VerifiedBundle, filename: Option<String>) -> Result<Pac
     .and_then(|helper| helper.validate_platform())
     .map_err(|e| e.to_string())?;
     reprise_bundle::assembly::disk_bytes(bundle).map_err(|e| e.to_string())?;
+    crate::theme::disk_bytes(bundle).map_err(|e| e.to_string())?;
     reprise_bundle::assembly::nor_installer(bundle).map_err(|e| e.to_string())?;
     Ok(PackageInfo {
         version: bundle.manifest().version.clone(),

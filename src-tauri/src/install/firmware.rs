@@ -55,7 +55,7 @@ pub(super) fn assemble(
     data: &Path,
     hardware_policy: reprise_device::firmware::HardwarePolicy,
     job: &mut Job<'_>,
-) -> Result<Artifacts> {
+) -> Result<(Artifacts, Option<crate::theme::Themes>)> {
     job.stage("decrypt", "Preparing Apple firmware")?;
     let cache = data.join("firmware");
     fs::create_dir_all(&cache)?;
@@ -109,7 +109,8 @@ pub(super) fn assemble(
         nor,
         hardware_policy,
     )?;
-    job.save_firmware(&artifacts)?;
+    let themes = crate::theme::assemble(bundle, &osos)?;
+    job.save_firmware(&artifacts, themes.as_ref())?;
 
-    Ok(artifacts)
+    Ok((artifacts, themes))
 }
