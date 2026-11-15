@@ -22,8 +22,9 @@ const key = (device: DeviceInfo) =>
  * the bus or re-enumerated at another address: a hung iPod stays on the bus,
  * and one still idle in DFU has to be put back in DFU by the user first, or a
  * lasting failure would retry forever. A failed check waits the same way.
+ * While `paused`, it keeps watching but does not start the checks.
  */
-export function useAutoRetry(enabled: boolean, onReady: () => void) {
+export function useAutoRetry(enabled: boolean, onReady: () => void, paused = false) {
   const checks = React.useSyncExternalStore(subscribeToChecks, getCheckState);
   const [phase, setPhase] = React.useState<"waiting" | "settling" | "checking">("waiting");
   const [error, setError] = React.useState<string | null>(null);
@@ -64,6 +65,7 @@ export function useAutoRetry(enabled: boolean, onReady: () => void) {
     }
     if (found === baseline.current) return;
     setPhase("settling");
+    if (paused) return;
     const timer = setTimeout(() => {
       baseline.current = found;
       const before = getCheckState().jobId;
@@ -78,10 +80,10 @@ export function useAutoRetry(enabled: boolean, onReady: () => void) {
       setPhase("checking");
     }, SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [active, scanned, failed, found]);
+  }, [active, scanned, failed, found, paused]);
 
   React.useEffect(() => {
-    if (phase !== "checking" || checks.running || checks.jobId !== jobId.current) return;
+    if (paused || phase !== "checking" || checks.running || checks.jobId !== jobId.current) return;
     const report = checks.report;
     if (report?.issue?.kind === "unknown_hardware" && expected.current?.override) {
       // The user already accepted this hardware for the install that failed.
@@ -106,7 +108,7 @@ export function useAutoRetry(enabled: boolean, onReady: () => void) {
     jobId.current = -1;
     setPhase("waiting");
     ready.current();
-  }, [phase, checks]);
+  }, [phase, checks, paused]);
 
   // Empty until the first scan, so the status region exists before its first
   // message and screen readers announce it.

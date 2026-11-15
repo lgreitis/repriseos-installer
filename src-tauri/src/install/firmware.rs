@@ -240,9 +240,10 @@ fn discard_if_invalid<T, E: Into<Box<dyn std::error::Error + Send + Sync>>>(
     partial: &Path,
     result: std::result::Result<T, E>,
 ) -> Result<T> {
-    result.or_else(|e| {
-        remove_partial(partial)?;
-        Err(e.into())
+    result.map_err(|e| {
+        // The verification error matters more than a failed removal.
+        let _ = remove_partial(partial);
+        e.into()
     })
 }
 
@@ -251,7 +252,10 @@ fn discard_if_invalid<T, E: Into<Box<dyn std::error::Error + Send + Sync>>>(
 /// it, and the plaintext goes back into the partial instead.
 fn save_or_keep(cache_file: &Path, image: &[u8], partial: &Path, plaintext: &[u8]) -> Result<()> {
     if let Err(e) = save(cache_file, image) {
-        if cache_file.is_file() {
+        let existed = e
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|e| e.kind() == std::io::ErrorKind::AlreadyExists);
+        if !existed && cache_file.is_file() {
             let _ = fs::remove_file(cache_file);
         }
         let _ = save_partial(partial, plaintext);

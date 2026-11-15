@@ -59,13 +59,12 @@ fn a_failed_save_keeps_the_plaintext_and_a_bad_image_drops_it() {
     assert!(save_or_keep(&blocked, b"image", &partial, &[7; 32]).is_err());
     assert_eq!(fs::read(&partial).unwrap(), vec![7; 32]);
 
-    // A file left in the image's place by a failed save goes, so the next
-    // attempt does not trust it.
+    // A file the save did not write stays.
     let image = cache.path().join("osos-2.0.5.bin");
-    fs::write(&image, b"half").unwrap();
+    fs::write(&image, b"other").unwrap();
     assert!(save_or_keep(&image, b"image", &partial, &[7; 32]).is_err());
-    assert!(!image.exists());
-    assert_eq!(fs::read(&partial).unwrap(), vec![7; 32]);
+    assert_eq!(fs::read(&image).unwrap(), b"other");
+    fs::remove_file(&image).unwrap();
 
     save_or_keep(&image, b"image", &partial, &[7; 32]).unwrap();
     assert!(image.exists() && !partial.exists());

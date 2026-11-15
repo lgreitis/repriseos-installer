@@ -32,11 +32,12 @@ const InstallationScreen: React.FC<IInstallationScreenProps> = ({
   const state = React.useSyncExternalStore(subscribeToInstallation, getInstallationState);
   const [now, setNow] = React.useState(Date.now());
   const [savingDebug, setSavingDebug] = React.useState(false);
-  // Waits while the debug ZIP is saved, so a retry does not replace the
-  // failed run it describes.
+  // Holds the retry while the debug ZIP is saved, so it does not replace the
+  // failed run it describes; the iPod is still watched meanwhile.
   const retry = useAutoRetry(
-    state.failure !== null && !state.running && !savingDebug && canRetry(state.failure),
+    state.failure !== null && !state.running && canRetry(state.failure),
     onRetry,
+    savingDebug,
   );
   const [debugResult, setDebugResult] = React.useState<string | null>(null);
   const [debugError, setDebugError] = React.useState<string | null>(null);
