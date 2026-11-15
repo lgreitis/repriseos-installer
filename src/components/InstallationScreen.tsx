@@ -1,9 +1,12 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import React from "react";
+import { useAutoRetry } from "../hooks/useAutoRetry";
 import { useHeadingFocus } from "../hooks/useHeadingFocus";
 import { errorDetail } from "../lib/errors";
 import {
   cancelInstallation,
+  canRetry,
+  failureMessage,
   formatElapsedTime,
   getInstallationState,
   installationLabel,
@@ -16,13 +19,25 @@ import { InstallerScreen } from "./ui/InstallerScreen";
 
 interface IInstallationScreenProps {
   onComplete: () => void;
-  onRecover: () => void;
+  /** Starts the operation again once the iPod is back and checked. */
+  onRetry: () => void;
+  onBack: () => void;
 }
 
-const InstallationScreen: React.FC<IInstallationScreenProps> = ({ onComplete, onRecover }) => {
+const InstallationScreen: React.FC<IInstallationScreenProps> = ({
+  onComplete,
+  onRetry,
+  onBack,
+}) => {
   const state = React.useSyncExternalStore(subscribeToInstallation, getInstallationState);
   const [now, setNow] = React.useState(Date.now());
   const [savingDebug, setSavingDebug] = React.useState(false);
+  // Waits while the debug ZIP is saved, so a retry does not replace the
+  // failed run it describes.
+  const retry = useAutoRetry(
+    state.failure !== null && !state.running && !savingDebug && canRetry(state.failure),
+    onRetry,
+  );
   const [debugResult, setDebugResult] = React.useState<string | null>(null);
   const [debugError, setDebugError] = React.useState<string | null>(null);
   const saveDebug = async () => {
@@ -46,13 +61,14 @@ const InstallationScreen: React.FC<IInstallationScreenProps> = ({ onComplete, on
   const elapsed = Math.max(0, (state.finishedAt ?? now) - state.startedAt);
   const snapshot = {
     id: `${state.event.stage}:${installationLabel(state.event)}`,
-    label: state.error ? "Installation stopped" : installationLabel(state.event),
+    label: installationLabel(state.event),
     complete: state.complete,
     percentage:
       state.event.total && state.event.completed !== null
         ? Math.min(100, Math.floor((state.event.completed * 100) / state.event.total))
         : null,
   };
+  const failure = state.failure && failureMessage(state.failure);
   const { headingRef } = useHeadingFocus();
   const reducedMotion = useReducedMotion();
 
@@ -63,45 +79,47 @@ const InstallationScreen: React.FC<IInstallationScreenProps> = ({ onComplete, on
   return (
     <InstallerScreen.Root aria-labelledby="installation-title">
       <InstallerScreen.Title id="installation-title" ref={headingRef} tabIndex={-1}>
-        {state.error ? "Installation stopped." : "Installing RepriseOS."}
+        {state.failure ? "Installation stopped." : "Installing RepriseOS."}
       </InstallerScreen.Title>
-      <div className="mx-auto mt-6 max-w-112">
-        <InstallationProgress
-          label={snapshot.label}
-          value={snapshot.percentage}
-          complete={snapshot.complete}
-          stage={snapshot.id}
-        />
-        <div className="mt-3 flex min-h-6 items-center justify-center gap-3 text-[13px] text-body">
-          <div aria-live="polite" aria-atomic="true">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={snapshot.id}
-                className="inline-block"
-                initial={{ opacity: 0, y: reducedMotion ? 0 : 3 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: reducedMotion ? 0 : 0.15 }}
-              >
-                {snapshot.label}
-                {snapshot.complete ? "." : "…"}
-              </motion.span>
-            </AnimatePresence>
+      {!state.failure && (
+        <div className="mx-auto mt-6 max-w-112">
+          <InstallationProgress
+            label={snapshot.label}
+            value={snapshot.percentage}
+            complete={snapshot.complete}
+            stage={snapshot.id}
+          />
+          <div className="mt-3 flex min-h-6 items-center justify-center gap-3 text-[13px] text-body">
+            <div aria-live="polite" aria-atomic="true">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={snapshot.id}
+                  className="inline-block"
+                  initial={{ opacity: 0, y: reducedMotion ? 0 : 3 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: reducedMotion ? 0 : 0.15 }}
+                >
+                  {snapshot.label}
+                  {snapshot.complete ? "." : "…"}
+                </motion.span>
+              </AnimatePresence>
+            </div>
+            {snapshot.percentage !== null && (
+              <span className="min-w-8 text-right font-medium tabular-nums text-ink">
+                {snapshot.percentage}%
+              </span>
+            )}
           </div>
-          {snapshot.percentage !== null && (
-            <span className="min-w-8 text-right font-medium tabular-nums text-ink">
-              {snapshot.percentage}%
-            </span>
-          )}
+          <p className="mt-2 text-[12px] tabular-nums text-muted">
+            Elapsed time{" "}
+            <span className="mx-1" aria-hidden="true">
+              ·
+            </span>{" "}
+            {formatElapsedTime(elapsed)}
+          </p>
         </div>
-        <p className="mt-2 text-[12px] tabular-nums text-muted">
-          Elapsed time{" "}
-          <span className="mx-1" aria-hidden="true">
-            ·
-          </span>{" "}
-          {formatElapsedTime(elapsed)}
-        </p>
-      </div>
+      )}
       {state.running && (
         <p className="mt-4 text-[12px] leading-5 text-muted">
           {state.cancelling
@@ -109,18 +127,53 @@ const InstallationScreen: React.FC<IInstallationScreenProps> = ({ onComplete, on
             : "Keep your iPod connected and your computer awake."}
         </p>
       )}
-      {state.error && (
-        <p role="alert" className="mt-4 break-words text-[13px] leading-6 text-[#aa3e36]">
-          {state.error}
-        </p>
+      {failure && (
+        <div className="mx-auto mt-6 max-w-112 text-[13px] leading-6">
+          <p role="alert" className="break-words text-body">
+            {failure.cause}
+          </p>
+          {failure.next && (
+            <div className="mt-5">
+              <p className="text-[14px] font-medium text-ink">{failure.next}</p>
+              {failure.retry && (
+                <>
+                  <p className="text-[12px] text-muted">
+                    Hold Menu + Center for about 12 seconds, past the Apple logo, and release when
+                    the screen turns black again.
+                  </p>
+                  {retry.error && (
+                    <p role="alert" className="mt-4 text-[#aa3e36]">
+                      {retry.error}
+                    </p>
+                  )}
+                  {/* Mounted empty so screen readers announce the first status. */}
+                  <p
+                    role="status"
+                    className="mt-4 inline-flex min-h-6 items-center gap-2 text-body"
+                  >
+                    {retry.status && (
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="size-1.5 rounded-full bg-focus motion-safe:animate-pulse"
+                        />
+                        {retry.status}
+                      </>
+                    )}
+                  </p>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       )}
       <InstallerScreen.Actions className="mt-6">
-        {state.error ? (
+        {state.failure ? (
           <>
-            <Button.Root disabled={savingDebug} onClick={onRecover}>
-              <Button.Label>DFU guide</Button.Label>
+            <Button.Root disabled={savingDebug || retry.checking} onClick={onBack}>
+              <Button.Label>Back to start</Button.Label>
             </Button.Root>
-            <Button.Root disabled={savingDebug} onClick={saveDebug}>
+            <Button.Root disabled={savingDebug || retry.checking} onClick={saveDebug}>
               <Button.Label>{savingDebug ? "Saving…" : "Save debug ZIP"}</Button.Label>
             </Button.Root>
           </>

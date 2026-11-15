@@ -1,5 +1,5 @@
 import type { EventChannel } from "../lib/backend.ts";
-import type { InstallEvent } from "../lib/installation.ts";
+import type { InstallEvent, InstallFailure } from "../lib/installation.ts";
 import type { UpdateProgress } from "../lib/updates.ts";
 import type { Wait } from "./checks.ts";
 import type { Scenario } from "./scenarios.ts";
@@ -14,6 +14,22 @@ const stages = [
   ["verify", "Verifying RepriseOS"],
   ["bootloader", "Sending bootloader installer"],
 ] as const;
+
+function failure({
+  stage,
+  detail,
+  deviceStopped = false,
+  keptPercent = null,
+}: NonNullable<Scenario["installFailure"]>): InstallFailure {
+  return {
+    detail,
+    error: detail,
+    stage,
+    device_stopped: deviceStopped,
+    kept_percent: keptPercent,
+    cancelled: false,
+  };
+}
 
 export async function simulateInstallation(
   scenario: Scenario,
@@ -31,9 +47,12 @@ export async function simulateInstallation(
         cancellable: stage !== "bootloader",
       });
       await wait();
-      if (cancelled()) throw new Error("Installation cancelled. Return to DFU mode to try again.");
+      if (cancelled()) {
+        const detail = "Installation cancelled.";
+        throw { ...failure({ stage, detail }), cancelled: true };
+      }
       if (scenario.installFailure?.stage === stage && completed === 50) {
-        throw new Error(scenario.installFailure.detail);
+        throw failure(scenario.installFailure);
       }
     }
   }

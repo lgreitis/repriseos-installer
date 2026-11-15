@@ -15,7 +15,12 @@ export interface Scenario {
   firmwareError?: string;
   localPackage?: boolean;
   packageError?: string;
-  installFailure?: { stage: string; detail: string };
+  installFailure?: {
+    stage: string;
+    detail: string;
+    deviceStopped?: boolean;
+    keptPercent?: number | null;
+  };
   debugExport?: "native" | "cancel" | "error";
   update?: "available" | "manual" | "current" | "check-error" | "download-error" | "installing";
   startUpdate?: boolean;
@@ -256,6 +261,29 @@ export const scenarios: Scenario[] = [
     },
   },
   {
+    id: "decrypt-stopped",
+    group: "Installation",
+    label: "iPod stopped during decryption",
+    screen: "installation",
+    installFailure: {
+      stage: "decrypt",
+      detail: "AES at input offset 0x313800: USB control read: Input/Output Error",
+      deviceStopped: true,
+      keptPercent: 30,
+    },
+  },
+  {
+    id: "bootloader-stopped",
+    group: "Installation",
+    label: "iPod stopped during bootloader install",
+    screen: "installation",
+    installFailure: {
+      stage: "bootloader",
+      detail: "USB DFU GETSTATUS: Input/Output Error",
+      deviceStopped: true,
+    },
+  },
+  {
     id: "transfer-failed",
     group: "Installation",
     label: "USB transfer failed",
@@ -264,6 +292,7 @@ export const scenarios: Scenario[] = [
       stage: "uploadOsos",
       detail:
         "USB transfer failed: device disconnected. Reconnect your iPod in DFU mode before trying again.",
+      deviceStopped: true,
     },
   },
   {

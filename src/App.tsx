@@ -136,7 +136,8 @@ const App: React.FC<AppProps> = ({ initial }) => {
             ) : screen === "installation" ? (
               <InstallationScreen
                 onComplete={() => setScreen("success")}
-                onRecover={() => setScreen("dfu")}
+                onRetry={beginInstall}
+                onBack={() => setScreen("main")}
               />
             ) : (
               <SuccessScreen onDone={() => setScreen("main")} />

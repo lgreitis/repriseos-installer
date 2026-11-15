@@ -4,6 +4,7 @@ import { setImmediate } from "node:timers/promises";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import {
   cancelInstallation,
+  failureMessage,
   getInstallationState,
   installationLabel,
   startInstallation,
@@ -75,7 +76,7 @@ test("starts once, forwards selected hashes, and waits for backend completion", 
   assert.equal(getInstallationState(), current);
   await setImmediate();
   assert.equal(getInstallationState().complete, false);
-  assert.equal(getInstallationState().error, "Readback failed");
+  assert.equal(getInstallationState().failure.detail, "Readback failed");
 });
 
 test("cancellation waits for cleanup and is disabled during NOR installation", async () => {
@@ -138,5 +139,77 @@ test("channel creation failure stops the job and allows retry", async () => {
   startInstallation(firmware, "package-hash");
   await setImmediate();
   assert.equal(getInstallationState().running, false);
-  assert.match(getInstallationState().error, /Channel unavailable/);
+  assert.match(getInstallationState().failure.detail, /Channel unavailable/);
+});
+
+test("failure message says what happened, what changed and how to go on", () => {
+  const failure = (fields) => ({
+    detail: "full log text",
+    error: "Not enough free space on the iPod",
+    stage: "storage",
+    device_stopped: false,
+    kept_percent: null,
+    cancelled: false,
+    ...fields,
+  });
+  const message = (fields) => failureMessage(failure(fields));
+  const retry = (cause, next) => ({ cause, next, retry: true });
+  const stop = (cause, next = null) => ({ cause, next, retry: false });
+  assert.deepEqual(
+    message({ stage: "decrypt", device_stopped: true, kept_percent: 30 }),
+    retry(
+      "Your iPod stopped responding. Nothing on it was changed. Decryption progress (30%) is saved.",
+      "Put your iPod back into DFU mode to continue.",
+    ),
+  );
+  assert.deepEqual(
+    message({ stage: "decrypt", device_stopped: true, kept_percent: 0 }),
+    retry(
+      "Your iPod stopped responding. Nothing on it was changed. Decryption progress is saved.",
+      "Put your iPod back into DFU mode to continue.",
+    ),
+  );
+  // Kept progress alone does not make a failure retryable.
+  assert.deepEqual(
+    message({ stage: "decrypt", error: "Could not write the log", kept_percent: 30 }),
+    stop("Could not write the log. Nothing on it was changed. Decryption progress (30%) is saved."),
+  );
+  assert.deepEqual(
+    message({ stage: "decrypt", error: "Cached firmware is invalid" }),
+    stop("Cached firmware is invalid. Nothing on it was changed."),
+  );
+  assert.deepEqual(
+    message({ stage: null, error: "Could not save result.json." }),
+    stop("Could not save result.json."),
+  );
+  assert.deepEqual(
+    message({}),
+    stop("Not enough free space on the iPod. Nothing on it was changed."),
+  );
+  assert.deepEqual(
+    message({ stage: "uploadOsos", device_stopped: true }),
+    retry("Your iPod stopped responding.", "Put your iPod back into DFU mode to try again."),
+  );
+  // A refused write leaves the iPod out of DFU mode.
+  assert.deepEqual(
+    message({ stage: "uploadOsos", error: "Upload helper refused the file" }),
+    stop(
+      "Upload helper refused the file.",
+      "Put your iPod back into DFU mode before you try again.",
+    ),
+  );
+  // DFU mode must not interrupt a bootloader install.
+  for (const stage of ["bootloader", "restart"]) {
+    assert.deepEqual(
+      message({ stage, device_stopped: true }),
+      stop(
+        "Your iPod stopped responding.",
+        "Leave your iPod connected and wait for it to restart before you disconnect it or try again.",
+      ),
+    );
+  }
+  assert.deepEqual(
+    message({ stage: "uploadOsos", device_stopped: true, cancelled: true }),
+    stop("You cancelled the installation."),
+  );
 });

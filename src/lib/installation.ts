@@ -36,6 +36,21 @@ export interface InstallEvent {
   diagnostic?: boolean;
 }
 
+/** Why an install stopped, as the backend reports it. */
+export interface InstallFailure {
+  /** Full text for the log, with the stage and backup path. */
+  detail: string;
+  /** The error alone. */
+  error: string;
+  stage: string | null;
+  /** The iPod stopped answering over USB. */
+  device_stopped: boolean;
+  /** Share of the Apple firmware decryption kept for the next attempt. */
+  kept_percent: number | null;
+  /** The backend stopped because the user cancelled. */
+  cancelled: boolean;
+}
+
 const labels: Record<string, string> = {
   prepare: "Preparing installation",
   storage: "Checking storage",
@@ -56,7 +71,7 @@ interface InstallationState {
   startedAt: number;
   finishedAt: number | null;
   event: InstallEvent;
-  error: string | null;
+  failure: InstallFailure | null;
   complete: boolean;
   cancelling: boolean;
   outcome: "installer_sent" | "files_updated" | null;
@@ -67,7 +82,7 @@ let state: InstallationState = {
   startedAt: 0,
   finishedAt: null,
   event: { stage: "prepare", detail: "", completed: null, total: null, cancellable: true },
-  error: null,
+  failure: null,
   complete: false,
   cancelling: false,
   outcome: null,
@@ -85,6 +100,83 @@ export function subscribeToInstallation(listener: () => void) {
   };
 }
 
+function failureOf(error: unknown, detail: string): InstallFailure {
+  if (typeof error === "object" && error !== null && "device_stopped" in error) {
+    return error as InstallFailure;
+  }
+  return {
+    detail,
+    error: detail,
+    stage: null,
+    device_stopped: false,
+    kept_percent: null,
+    cancelled: false,
+  };
+}
+
+// Stages that only read from the iPod; a failure there leaves it as it was.
+const readOnlyStages = new Set([
+  "prepare",
+  "checkBootloader",
+  "storage",
+  "backup",
+  "decrypt",
+  "assemble",
+]);
+
+// Stages after the bootloader handoff; the iPod may be installing it.
+const handoffStages = new Set(["bootloader", "restart"]);
+
+/** Whether waiting for the iPod and running again can fix the failure: it
+ * stopped responding before the bootloader handoff. A cancel, full storage
+ * or a refused package need the user instead, and DFU mode must not
+ * interrupt a bootloader install. */
+export function canRetry(failure: InstallFailure) {
+  return (
+    !failure.cancelled &&
+    failure.device_stopped &&
+    (failure.stage === null || !handoffStages.has(failure.stage))
+  );
+}
+
+/** The failure screen's text: what happened, then what to do next, and
+ * whether the screen waits for the iPod to retry. */
+export function failureMessage(failure: InstallFailure): {
+  cause: string;
+  next: string | null;
+  retry: boolean;
+} {
+  const cause = failure.cancelled
+    ? "You cancelled the installation."
+    : failure.device_stopped
+      ? "Your iPod stopped responding."
+      : /[.!?]$/.test(failure.error)
+        ? failure.error
+        : `${failure.error}.`;
+  // Without a stage the failure may have come after the iPod was written.
+  const unchanged = failure.stage !== null && readOnlyStages.has(failure.stage);
+  const kept = failure.kept_percent;
+  const saved =
+    kept === null
+      ? ""
+      : kept > 0
+        ? ` Decryption progress (${kept}%) is saved.`
+        : " Decryption progress is saved.";
+  const retry = canRetry(failure);
+  const handoff = failure.stage !== null && handoffStages.has(failure.stage);
+  return {
+    cause: cause + (unchanged ? " Nothing on it was changed." : "") + saved,
+    next: retry
+      ? `Put your iPod back into DFU mode to ${kept !== null ? "continue" : "try again"}.`
+      : failure.cancelled || failure.stage === null || unchanged
+        ? null
+        : handoff
+          ? "Leave your iPod connected and wait for it to restart before you disconnect it or try again."
+          : "Put your iPod back into DFU mode before you try again.",
+    retry,
+  };
+}
+
 export function installationLabel(event: InstallEvent) {
   if (event.stage === "storage") return labels.storage;
   return event.detail || labels[event.stage];
@@ -99,7 +191,7 @@ export function startInstallation(firmware: FirmwareInfo, packageDigest: string)
     startedAt: Date.now(),
     finishedAt: null,
     event: { stage: "prepare", detail: "", completed: null, total: null, cancellable: true },
-    error: null,
+    failure: null,
     complete: false,
     cancelling: false,
     outcome: null,
@@ -152,7 +244,12 @@ export function startInstallation(firmware: FirmwareInfo, packageDigest: string)
     .catch((error: unknown) => {
       const detail = errorDetail(error);
       appendSessionLog(`Installation stopped: ${detail}`);
-      publish({ ...state, running: false, error: detail, finishedAt: Date.now() });
+      publish({
+        ...state,
+        running: false,
+        failure: failureOf(error, detail),
+        finishedAt: Date.now(),
+      });
     });
 }
 
