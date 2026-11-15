@@ -5,7 +5,7 @@ mod transfer;
 
 use crate::{device::UsbState, firmware::FirmwareState, package::PackageState};
 use job::Job;
-pub use job::{InstallEvent, InstallResult};
+pub use job::{InstallEvent, InstallFailure, InstallResult};
 use reprise_bundle::assembly;
 use reprise_device::UploadHelper;
 use std::sync::{
@@ -53,14 +53,12 @@ pub async fn install(
     firmware_sha256: String,
     package_digest: String,
     on_event: Channel<InstallEvent>,
-) -> std::result::Result<InstallResult, String> {
-    let operation = app
-        .state::<UsbState>()
-        .acquire()
-        .map_err(|e| e.to_string())?;
+) -> std::result::Result<InstallResult, InstallFailure> {
+    let plain = |e: &dyn std::fmt::Display| InstallFailure::plain(e.to_string());
+    let operation = app.state::<UsbState>().acquire().map_err(|e| plain(&e))?;
     let state = app.state::<InstallState>();
-    *state.failed_directory.lock().map_err(|e| e.to_string())? = None;
-    *state.cancellation.lock().map_err(|e| e.to_string())? = Cancellation {
+    *state.failed_directory.lock().map_err(|e| plain(&e))? = None;
+    *state.cancellation.lock().map_err(|e| plain(&e))? = Cancellation {
         requested: false,
         allowed: true,
     };
@@ -69,10 +67,15 @@ pub async fn install(
         let _operation = operation;
         let state = app.state::<InstallState>();
         let _running = Running(&state);
-        run(&app, &state, firmware_sha256, package_digest, on_event).map_err(|e| e.to_string())
+        run(&app, &state, firmware_sha256, package_digest, on_event).map_err(|e| {
+            match e.downcast::<InstallFailure>() {
+                Ok(failure) => *failure,
+                Err(e) => plain(&e),
+            }
+        })
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| plain(&e))?
 }
 
 fn run(
