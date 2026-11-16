@@ -20,6 +20,13 @@ export function createMockBackend(
   let overrideAvailable = false;
   let usbReady = !scenario.usbSetup;
   let usbAttempts = 0;
+  // Discovery polls that still miss the iPod while it is put back in DFU.
+  let awayPolls = 0;
+  const away = <T>(operation: Promise<T>) =>
+    operation.catch((error: unknown) => {
+      awayPolls = 4;
+      throw error;
+    });
 
   async function handle(command: string, args: Record<string, unknown>) {
     switch (command) {
@@ -47,6 +54,10 @@ export function createMockBackend(
         if (scenario.discovery === "denied")
           throw new Error("USB discovery failed: access denied.");
         if (scenario.discovery === "absent") return [];
+        if (awayPolls > 0) {
+          awayPolls -= 1;
+          return [];
+        }
         if (scenario.discovery === "normal") return [{ ...mockDevice, dfu_candidate: false }];
         if (scenario.discovery === "multiple")
           return [mockDevice, { ...mockDevice, selector: { bus: 1, address: 2 } }];
@@ -90,7 +101,7 @@ export function createMockBackend(
         };
       case "install":
         cancelled = false;
-        return simulateInstallation(scenario, channel(args), wait, () => cancelled);
+        return away(simulateInstallation(scenario, channel(args), wait, () => cancelled));
       case "cancel_install":
         cancelled = true;
         return;

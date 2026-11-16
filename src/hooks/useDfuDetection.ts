@@ -6,6 +6,8 @@ import { appendSessionLog } from "../lib/sessionLog";
 export function useDfuDetection(enabled: boolean) {
   const [devices, setDevices] = React.useState<DeviceInfo[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  // Whether `devices` comes from a scan since polling was last enabled.
+  const [scanned, setScanned] = React.useState(false);
 
   React.useEffect(() => {
     if (!enabled) return;
@@ -17,6 +19,7 @@ export function useDfuDetection(enabled: boolean) {
         if (!active) return;
         setDevices(found);
         setError(null);
+        setScanned(true);
       } catch (error) {
         if (!active) return;
         setDevices([]);
@@ -25,9 +28,13 @@ export function useDfuDetection(enabled: boolean) {
       if (active) timer = setTimeout(poll, 500);
     };
     void poll();
+    // A later enable starts from no scan, not from what the last poll saw.
     return () => {
       active = false;
       clearTimeout(timer);
+      setScanned(false);
+      setDevices([]);
+      setError(null);
     };
   }, [enabled]);
 
@@ -49,5 +56,7 @@ export function useDfuDetection(enabled: boolean) {
     appendSessionLog(`DFU discovery: ${message}`);
   }, [enabled, message]);
 
-  return { device, message };
+  // Nothing connected and nothing wrong: the plain waiting state.
+  const idle = !error && devices.length === 0;
+  return { device, message, scanned, failed: error !== null, idle };
 }

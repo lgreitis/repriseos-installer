@@ -3167,7 +3167,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 [[package]]
 name = "reprise-bundle"
 version = "0.3.0"
-source = "git+https://github.com/lgreitis/osos-lab.git?rev=91c723352f88c1229cdc897b2a8c93f3ab7e661d#91c723352f88c1229cdc897b2a8c93f3ab7e661d"
+source = "git+https://github.com/lgreitis/osos-lab.git?rev=0575ef9abc62d7a0bb081279ea8551033b3969ae#0575ef9abc62d7a0bb081279ea8551033b3969ae"
 dependencies = [
  "ed25519-dalek",
  "mu_uefi_decompress",
@@ -3186,7 +3186,7 @@ dependencies = [
 [[package]]
 name = "reprise-device"
 version = "0.3.0"
-source = "git+https://github.com/lgreitis/osos-lab.git?rev=91c723352f88c1229cdc897b2a8c93f3ab7e661d#91c723352f88c1229cdc897b2a8c93f3ab7e661d"
+source = "git+https://github.com/lgreitis/osos-lab.git?rev=0575ef9abc62d7a0bb081279ea8551033b3969ae#0575ef9abc62d7a0bb081279ea8551033b3969ae"
 dependencies = [
  "getrandom 0.3.4",
  "rusb",
@@ -3209,6 +3209,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",

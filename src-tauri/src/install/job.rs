@@ -1,4 +1,4 @@
-use super::{InstallState, Result};
+use super::{firmware::DecryptKept, InstallState, Result};
 use reprise_bundle::assembly::{Artifacts, BootloaderAction};
 use reprise_device::{Identity, NorDump, SysCfg, NOR_SIZE};
 use serde::Serialize;
@@ -25,6 +25,56 @@ pub struct InstallEvent {
 pub(super) enum InstallOutcome {
     InstallerSent,
     FilesUpdated,
+}
+
+/// Why an install stopped, for the failure screen. `detail` is the full
+/// text that also goes to the log.
+#[derive(Debug, Serialize)]
+pub struct InstallFailure {
+    detail: String,
+    /// The error alone, without the stage and backup path.
+    error: String,
+    stage: Option<String>,
+    /// The iPod stopped answering over USB.
+    device_stopped: bool,
+    /// Share of the Apple image being decrypted that is kept for the next attempt.
+    kept_percent: Option<usize>,
+    /// The job stopped because the user cancelled while cancelling was allowed.
+    cancelled: bool,
+}
+
+impl InstallFailure {
+    /// A failure outside any stage, such as one before the job started.
+    pub(super) fn plain(error: String) -> Self {
+        Self {
+            detail: error.clone(),
+            error,
+            stage: None,
+            device_stopped: false,
+            kept_percent: None,
+            cancelled: false,
+        }
+    }
+}
+
+impl std::fmt::Display for InstallFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.detail)
+    }
+}
+
+impl std::error::Error for InstallFailure {}
+
+/// Whether an error comes from the iPod no longer answering over USB.
+fn device_stopped(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut next = Some(error);
+    while let Some(error) = next {
+        if let Some(error) = error.downcast_ref::<reprise_device::Error>() {
+            return error.device_stopped();
+        }
+        next = error.source();
+    }
+    false
 }
 
 #[derive(Serialize)]
@@ -311,11 +361,15 @@ impl<'a> Job<'a> {
                     InstallOutcome::FilesUpdated => "UPDATE COMPLETE: disk files verified; NOR unchanged; restart requested; boot not verified",
                     InstallOutcome::InstallerSent => "BOOTLOADER HANDOFF: disk files verified; NOR installer sent; NOR completion not read back",
                 });
-                save_json(
+                // The iPod may already be installing the bootloader, so a log that
+                // cannot be written must not turn the result into a failure.
+                let saved = save_json(
                     &self.directory.join("result.json"),
                     &serde_json::json!({"state": outcome, "operation": self.operation, "bootloader_action": self.bootloader_action}),
-                )?;
-                self.journal.sync_all()?;
+                );
+                if let Err(e) = saved.and_then(|()| Ok(self.journal.sync_all()?)) {
+                    self.log(format!("Could not save the result: {e}"));
+                }
                 Ok(InstallResult {
                     backup_path: self.directory.to_string_lossy().into_owned(),
                     outcome,
@@ -323,8 +377,14 @@ impl<'a> Job<'a> {
                 })
             }
             Err(error) => {
+                // After the handoff the iPod may be installing the bootloader.
+                let next = if !self.cancellable {
+                    "Leave the iPod connected until it restarts."
+                } else {
+                    "Re-enter DFU before retrying."
+                };
                 let detail = format!(
-                    "{} failed during {}: {error} Backups and logs: {}. Re-enter DFU before retrying.",
+                    "{} failed during {}: {error} Backups and logs: {}. {next}",
                     self.operation.unwrap_or("install/update").to_uppercase(),
                     self.stage,
                     self.directory.display()
@@ -338,7 +398,19 @@ impl<'a> Job<'a> {
                 if let Ok(mut directory) = self.state.failed_directory.lock() {
                     *directory = Some(self.directory.clone());
                 }
-                Err(detail.into())
+                let kept = error.downcast_ref::<DecryptKept>();
+                Err(Box::new(InstallFailure {
+                    detail,
+                    error: kept.map_or_else(|| error.to_string(), |kept| kept.source.to_string()),
+                    stage: Some(self.stage.clone()),
+                    device_stopped: device_stopped(&*error),
+                    kept_percent: kept.map(|kept| kept.percent),
+                    cancelled: self
+                        .state
+                        .cancellation
+                        .lock()
+                        .is_ok_and(|cancellation| cancellation.requested),
+                }))
             }
         }
     }

@@ -311,3 +311,33 @@ fn saved_nor_reuse_requires_matching_identity_and_content_hash() {
     fs::remove_dir_all(directory).unwrap();
     fs::remove_dir_all(snapshot).unwrap();
 }
+
+#[test]
+fn a_lost_ipod_is_found_through_upload_and_decrypt_errors() {
+    use reprise_device::{Cleanup, Error, UploadFailure};
+    let lost = || Error::Context {
+        context: "/osos-cfw.bin".into(),
+        source: Box::new(Error::Usb {
+            operation: "file upload",
+            source: rusb::Error::NoDevice,
+        }),
+    };
+    let upload = |error| -> Box<dyn std::error::Error + Send + Sync> {
+        Box::new(UploadFailure {
+            message: "upload failed".into(),
+            cleanup: Cleanup::NotAttempted,
+            reports: vec![],
+            error,
+        })
+    };
+    assert!(device_stopped(&*upload(lost())));
+    assert!(!device_stopped(&*upload(Error::Invalid("refused".into()))));
+    let kept: Box<dyn std::error::Error + Send + Sync> =
+        Box::new(super::super::firmware::DecryptKept {
+            source: Error::TimedOut("DFU return timed out".into()),
+            percent: 30,
+        });
+    assert!(device_stopped(&*kept));
+    let plain: Box<dyn std::error::Error + Send + Sync> = "Installation cancelled.".into();
+    assert!(!device_stopped(&*plain));
+}

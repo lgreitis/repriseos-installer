@@ -131,8 +131,10 @@ test("installation scenarios report progress, failures, success and cancellation
     const { channel, events } = capture(backend);
     const pending = backend.invoke("install", { onEvent: channel });
     if (scenario.installFailure) {
-      await assert.rejects(pending, { message: scenario.installFailure.detail });
-      assert.ok(events.every((event) => event.stage !== "bootloader"));
+      await assert.rejects(pending, { detail: scenario.installFailure.detail });
+      // A failure stops at its stage; only a bootloader failure reaches it.
+      const reached = events.some((event) => event.stage === "bootloader");
+      assert.equal(reached, scenario.installFailure.stage === "bootloader");
     } else {
       assert.match((await pending).backup_path, /Simulated/);
       assert.equal(events.at(-1).cancellable, false);
@@ -143,7 +145,7 @@ test("installation scenarios report progress, failures, success and cancellation
   const { channel } = capture(backend);
   const pending = backend.invoke("install", { onEvent: channel });
   await backend.invoke("cancel_install");
-  await assert.rejects(pending, /cancelled/);
+  await assert.rejects(pending, { cancelled: true });
   assert.match((await backend.invoke("install", { onEvent: channel })).backup_path, /Simulated/);
 });
 
